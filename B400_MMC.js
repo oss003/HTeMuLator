@@ -93,6 +93,7 @@ var
     driveInfo[3] = new Struct(0,"",255);
 
     lastDriveNo = -1;
+    globalCurDrive = 0;
 
 /*
 ;==============================================================
@@ -198,6 +199,7 @@ function fMMCWrite(nAddr,nVal)
                 case CMD_GET_IMG_STATUS:
                     // retrieve sddos image status
                     // globalData[0] = img num
+                    globalCurDrive=globalData[0];
                     WriteDataPort(driveInfo[byteValueLatch & 3].attribs);
                     break;
 

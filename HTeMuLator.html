@@ -11,17 +11,6 @@
 		     Version:
 			0.0 - 20170806 - Initial version Phil Mainwaring
 			0.1 - 20170808 - Source structered Kees van Oss 
-		     Found bugs:
-			- Error is displaying graphic modes:
-				CLEAR0 (m= 0)		Ok
-				CLEAR1 (m= 1) colour	Colour stripes
-				CLEAR1 (m= 3)		Mono stripes + coloured cursor
-				CLEAR2 (m= 5) colour	Colour stripes
-				CLEAR2 (m= 7)		Mono stripes + coloured cursor
-				CLEAR3 (m= 9) colour	Colour stripes
-				CLEAR3 (m=11)		Mono stripes + coloured cursor
-				CLEAR4 (m=13) colour	Ok
-				CLEAR4 (m=15)		Mono stripes + coloured cursor
 		-->
 
 		<title>
@@ -936,12 +925,12 @@ function fIOPoll(c)
 
 function fIOR(a,A)
 {
-	return(A=(a>>10)&3)?A-2?0:fVIARead(a):fPIAR(a&3)
+	return(A=(a>>10)&3)?A-1?A-2?0:fVIARead(a):fMMCRead(a):fPIAR(a&3)
 }
 
 function fIOW(a,v)
 {
-	(A=(a>>10)&3)?A-2?0:fVIAWrite(a,v):fPIAW(a&15,v)
+	(A=(a>>10)&3)?A-1?A-2?0:fVIAWrite(a,v):fMMCWrite(a,v):fPIAW(a&15,v)
 }
 
 function fSpeaker(bOn){/* Sound not yet implemented */}
@@ -953,20 +942,17 @@ function fSpeaker(bOn){/* Sound not yet implemented */}
 function STBA(a,v,A)
 {
 	a<2048?(MEM[a]=v):					// 0x0000-0x1FFF
-	(A=a>>12)<10?A<2?0:					// 0x2000-0x9FFF
+	(A=a>>12)<10?A<2?MEM[a]=v:				// 0x2000-0x9FFF
 	(MEM[a]=v,(a-=HIMEM)>=0&&a<nLen?fP(a,v):0):		// ???
 	A-11?0:fIOW(a,v&0xff)					// 0xB000-0xBFFF
 }
 
 function LDBA(a,A)
 {
-	if(a<2560)return MEM[a]					// 0x0000-0x09FF
-	if(a<2688)return(a&=15)==4||a==12?255:0			// 0x0A00-0x0A7F
-	if((A=a>>12)<2)return 0					// 0x0A80-0x1FFF
-	if(A<10)return MEM[a]					// 0x2000-0x9FFF
+	if((A=a>>12)<10)return MEM[a]				// 0x0000-0x9FFF
 	switch(A)
 	{
-		case 10:return sAXR1_ROM.charCodeAt(a-40960)	// 0xA000-0xAFFF
+		case 10:return sSDROM_ROM.charCodeAt(a-40960)	// 0xA000-0xAFFF
 		case 11:return fIOR(a)&0xff			// 0xB000-0xBFFF
 		case 12:return sABASIC_IC20.charCodeAt(a-49152)	// 0xC000-0xCFFF
 		case 13:return sAFloat_IC21.charCodeAt(a-53248)	// 0xD000-0xDFFF
@@ -1261,6 +1247,8 @@ function fDemo(aDemo, nFile)
 
 function fAction(s)
 {
+	if (s == "CLS") $("fDebug").value="";return;
+
 	fSetDemo(s == "LOAD" ? $("fSource").value : sSnake)
 	bInput = false;
 	nPal^=1;fMode(0,nPal^1);
@@ -1604,6 +1592,8 @@ function fLogin()
 		<script type = "text/javascript" language = "JavaScript" src = "./atom_roms_all.js"></script>
 		<script type = "text/javascript" language = "JavaScript" src = "./m6502.js"></script>
 		<script type = "text/javascript" language = "JavaScript" src = "./6522_VIA.js"></script>
+		<script type = "text/javascript" language = "JavaScript" src = "./B400_MMC.js"></script>
+		<script type = "text/javascript" language = "JavaScript" src = "./Disk001.js"></script>
 	</head>
 	<body class = "cBlock">
 		<div id = "dManual" class = "cBlock"></div>
@@ -1807,14 +1797,16 @@ function fLogin()
 9999 (C) ACORNSOFT 1981,PM 2012
 					</textarea>
 
-<textarea id = "fDebug" cols = "32" rows = "16">
-Debug
-</textarea>
 					<br />
 					<button onclick = "fAction('LOAD')">LOAD</button>
 					<button onclick = "fAction('DEMO')">DEMO</button>
 				</div>
-				<button onclick = "fToggle()">CODE</button>
+				<button onclick = "fToggle()">CODE</button><br>
+
+				<textarea id = "fDebug" cols = "20" rows = "16" overflow-y: scroll;>
+Debug
+				</textarea><br>
+				<button onclick = "fAction('CLS')">CLS</button>
 			</div>
 		</div>
 		<center>
