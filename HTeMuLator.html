@@ -1,0 +1,1824 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html lang = "en">
+	<head>
+
+		<!-- Tested with
+			Internet Explorer 9.0.8112.16421; 
+			Google Chrome 10.0.648.204;
+			Apple Safari 5.0.4 (7553.20.27);
+			Firefox 4.0;
+			Opera 11.01 Build 1190 under Win XP
+		     Version:
+			0.0 - 20170806 - Initial version Phil Mainwaring
+			0.1 - 20170808 - Source structered Kees van Oss 
+		     Found bugs:
+			- Error is displaying graphic modes:
+				CLEAR0 (m= 0)		Ok
+				CLEAR1 (m= 1) colour	Colour stripes
+				CLEAR1 (m= 3)		Mono stripes + coloured cursor
+				CLEAR2 (m= 5) colour	Colour stripes
+				CLEAR2 (m= 7)		Mono stripes + coloured cursor
+				CLEAR3 (m= 9) colour	Colour stripes
+				CLEAR3 (m=11)		Mono stripes + coloured cursor
+				CLEAR4 (m=13) colour	Ok
+				CLEAR4 (m=15)		Mono stripes + coloured cursor
+		-->
+
+		<title>
+			Acorn Atom Emulator
+		</title>
+
+		<style type = "text/css">
+
+ 			body
+			{
+				width:		100%;
+				height:		100%;
+				left:		0px;
+				top:		0px;
+				font-size:	100%;
+				line-height:	1.125em;
+				background:	url("./computer_font_screen_blank_grey.png") 0 0 repeat; /* #171717; */
+			}
+
+			b
+			{
+				display:	block;
+				position:	absolute;
+				overflow:	hidden;
+				border:		0px;
+				margin:		0px;
+				padding:	0px;
+				vertical-align:	center;
+				text-align:	center;
+				font-weight:	bold;
+			}
+
+			button, textarea
+			{
+				font-family:	"Lucida Console", monospace;
+				background-color:#171717;
+				color:		#0f0;
+			}
+
+			.cBlock
+			{
+				display:	block;
+				position:	absolute;
+				overflow:	hidden;
+				border:		0px;
+				margin:		0px;
+				padding:	0px;
+			}
+
+			.cChar
+			{
+				width:		32px;
+				height:		48px;
+				background:	url("./atom_font_colour_large.png") 0 0 no-repeat;
+			}
+
+			.cCharGrn
+			{
+				width:		32px;
+				height:		48px;
+				background:	url("./atom_font_colour_large.png") 0 0 no-repeat;
+			}
+
+			#dTxtScreen
+			{
+				position:		absolute;
+				width:			1024px;
+				height:			768px;
+				left:			128px;
+				top:			0px;
+			}
+
+			#dManual
+			{
+				background-color:	gray;
+			}
+
+		</style>
+		<script type = "text/javascript">
+			<!--
+
+var
+	// bOnline = document.location.href.substr(0, 4) == "http",
+	bLocal  = document.location.href.substr(0, 7).toLowerCase() == "file://",
+	bOnline = !bLocal, 
+	bKBEn = true, 			// Keyboard enable
+	bBBC = false, 			// Enable BBC mode
+	bGreen = false, 
+
+	nError = 0, 
+	nCycles = 0, 
+	nSpeed = 0, 
+	nTapeHz = (CPUHz / 2400)|0, 
+	nTapeClk = 0, 
+	nHz = 0, 
+	nInterrupt = 0,
+	nT = 0,
+
+	sHelp = "", 
+
+	oErrWin = null, 
+	oClock = null, 
+	oTimer = null, 
+	oScr, 
+
+	B = 255,
+	PPIA_ADDR, 
+	aPPIA = [0, B, 0xc3, 0],	// PIA 8255 registers
+
+	SCRHz = 60, 			// Screen refresh frequency
+	CPUHz = 1000000, 		// CPU speed
+	SYN = 78+(CPUHz / SCRHz)|0, 
+	VBL = (SYN * 287.5 / 312.5)|0, 
+	FONT_WIDTH = 32, 
+	FONT_HEIGHT = 48, 
+	COLS = 32, 
+	ROWS = 16, 
+	FW, 
+	FH, 
+
+	HIMEM, 				// Top of RAM
+	MEM = [], 			// RAM array
+
+// Error definitions
+
+	aErrors =
+	[
+		{ nCode:   2, sName: "Too many GOSUBs" },
+		{ nCode:   6, sName: "SUM  Checksum error" },
+		{ nCode:  18, sName: "Too many DO statements" },
+		{ nCode:  29, sName: "Unknown or missing function" },
+		{ nCode:  30, sName: "Array too large in DIM statement" },
+		{ nCode:  31, sName: "RETURN without GOSUB" },
+		{ nCode:  39, sName: "Attempt to use variable in LIST" },
+		{ nCode:  48, sName: "COM? Command error" },
+		{ nCode:  69, sName: "Illegal FDIM statement" },
+		{ nCode:  76, sName: "Assembler label error" },
+		{ nCode:  91, sName: "No hexadecimal number after '#'" },
+		{ nCode:  94, sName: "Unknown command, invalid statement terminator; missing END" },
+		{ nCode:  95, sName: "Floating-point item missing or malformed" },
+		{ nCode: 109, sName: "Number too large" },
+		{ nCode: 111, sName: "Missing variable in FOR; too many FOR statements" },
+		{ nCode: 118, sName: "NAME Name error" },
+		{ nCode: 123, sName: "Illegal argument to floating-point function" },
+		{ nCode: 127, sName: "Line number not found in GOTO or GOSUB" },
+		{ nCode: 128, sName: "Argument to SIN, COS or TAN too large" },
+		{ nCode: 129, sName: "Division by zero, protected RAM in graphics mode" },
+		{ nCode: 134, sName: "Array subscript out of range" },
+		{ nCode: 135, sName: "SYN? Syntax error" },
+		{ nCode: 149, sName: "Floating-point array subscript out of range" },
+		{ nCode: 152, sName: "GOSUB without RETURN; FOR without NEXT" },
+		{ nCode: 156, sName: "Assembler error: illegal type" },
+		{ nCode: 157, sName: "Label not found" },
+		{ nCode: 159, sName: "Unmatched quotes in PRINT or INPUT" },
+		{ nCode: 165, sName: "Loading interrupted" },
+		{ nCode: 169, sName: "Floating-point result too large" },
+		{ nCode: 174, sName: "Significant item missing or malformed" },
+		{ nCode: 191, sName: "LOG or power of zero or a negative number" },
+		{ nCode: 198, sName: "UNTIL with no DO" },
+		{ nCode: 200, sName: "Unmatched quotes in string" },
+		{ nCode: 208, sName: "Unrecognised mnemonic in assembler" },
+		{ nCode: 216, sName: "Illegal DIM statement" },
+		{ nCode: 230, sName: "NEXT without matching FOR" },
+		{ nCode: 238, sName: "Argument to EXP too large" },
+		{ nCode: 248, sName: "Not enough room to insert line" }
+	],
+	
+// Key definitions
+
+	CODE_SHIFT = 1, 
+	CODE_CTRL = CODE_SHIFT + 1, 
+	CODE_ALT = CODE_CTRL + 1, 
+	CODE_ALT_GR = CODE_ALT + 1,
+	SHIFT = CODE_SHIFT, 
+	CTRL = SHIFT << 1, 
+	ALT = CTRL << 1, 
+	ALT_GR = ALT << 1, 
+	PRESSED = ALT_GR << 1, 
+	INVALID = 128,
+	nShift = 0, 
+	nCtrl = 0, 
+	nAlt = 0, 
+	nAltGr = 0, 
+	nKeyCode, 
+	nCode, 
+	nOrd, 
+	sMods,
+	sPCLookUp,
+
+	aPCKeys =
+	[
+		//		K  M  A RC G L               U               N
+		/* 00   0   */"00 00 c0 00 0",
+		/* 01   1   */"10 01 41 81 2 &#x21E7;        &#x21E7;        Left Shift",
+		/* 02   2   */"11 02 42 a1 2                 Ctrl            Left Ctrl",
+		/* 03   3   */"12 03 43 a3 2                 Alt             Alt",
+		/* 04   4   */"0f 04 44 a5 2                 Alt Gr          Alt Graphics",
+		/* 05   5   */"00 01 45 8d 2 &#x21E7;        &#x21E7;        Right Shift",
+		/* 06   6   */"00 02 46 a8 2                 Ctrl            Right Ctrl",
+		/* 07   7   */"2e 07 47 4f e Delete          Delete          Delete",
+		/* 08   8   */"08 08 08 2e e &larr;          &larr;          Back Space",
+		/* 09   9   */"09 09 09 41 3 Tab &#x21E5;    Tab &#x21E4;    Tab",
+		/* 0a  10   */"2d 0a 4a 2f e Insert          Insert          Insert",
+		/* 0b  11   */"00 00 4b 00 1 Fn              Fn              Function",
+		/* 0c  12   */"0c 0c 4c 00 5                                 Numeric 5",
+		/* 0d  13   */"0d 0d 0d 4e 3 &#x21B5;        Enter           Enter",
+		/* 0e  14   */"00 0d 4e 92 5 Enter           Enter           Numeric Enter",
+		/* 0f  15   */"21 0f 4f 31 c Up              Page            Page Up",
+		/* 10  16   */"2c 10 50 0e 1 Sys Rq          <u>Prt Scrn</u> System Request / Print Screen",
+		/* 11  17   */"24 11 51 30 c Home            Home            Home",
+		/* 12  18   */"23 12 52 50 c End             End             End",
+		/* 13  19   */"13 13 53 0f 1 Break           <u>Pause</u>    Break",
+		/* 14  20   */"14 14 54 61 2 Caps Lock       Caps Lock       Caps Lock",
+		/* 15  21   */"91 15 55 0f 1 Lock            Scroll          Scroll Lock",
+		/* 16  22   */"90 16 56 32 2 numlock.png     Num<br />Lock   Num Lock",
+		/* 17  23   */"5c 17 57 a2 1                 winlogo.png     Left Windows",
+		/* 18  24   */"5b 18 58 a6 1                 winlogo.png     Right Windows",
+		/* 19  25   */"5d 19 59 a7 1                 prop.png        Properties",
+		/* 1a  26   */"22 1a 5a 51 c Down            Page            Page Down",
+		/* 1b  27   */"1b 1b 1b 01 3 Esc             Esc             Escape",
+		/* 1c  28   */"25 1c 5c a8 c &larr;          &larr;          Cursor Left",
+		/* 1d  29   */"26 1d 5d 8e c &uarr;          &uarr;          Cursor Up",
+		/* 1e  30   */"27 1e b6 aa c &rarr;          &rarr;          Cursor Right",
+		/* 1f  31   */"28 1f ad a9 c &darr;          &darr;          Cursor Down",
+		/* 20  32   */"20 20 20 a4 b                                 Space",
+		/* 21  33 ! */"00 00 b1 00 f",
+		/* 22  34 " */"00 00 b2 00 f",
+		/* 23  35 # */"de 23 23 6d b #               &tilde;         # / &tilde;",
+		/* 24  36 $ */"00 00 b4 00 f",
+		/* 25  37 % */"00 00 b5 00 f",
+		/* 26  38 & */"00 00 b7 00 f",
+		/* 27  39 ' */"00 00 27 00 f",
+		/* 28  40 ( */"00 00 b9 00 f",
+		/* 29  41 ) */"00 00 b0 00 f",
+		/* 2a  42 * */"00 00 b8 00 f",
+		/* 2b  43 + */"00 00 bd 00 f",
+		/* 2c  44 , */"00 00 2c 00 f",
+		/* 2d  45 - */"00 00 2d 00 f",
+		/* 2e  46 . */"00 00 2e 00 f",
+		/* 2f  47 / */"00 00 2f 00 f",
+		/* 30  48 0 */"30 30 30 2b d 0               )               0 / )",
+		/* 31  49 1 */"31 31 31 22 d 1               !               1 / !",
+		/* 32  50 2 */"32 32 32 23 d 2               &quot;          2 / &quot;",
+		/* 33  51 3 */"33 33 33 24 d 3               &pound;         3 / &pound;",
+		/* 34  52 4 */"34 34 34 25 d 4               $               4 / $",
+		/* 35  53 5 */"35 35 35 26 d 5               %               5 / %",
+		/* 36  54 6 */"36 36 36 27 d 6               ^               6 / ^",
+		/* 37  55 7 */"37 37 37 28 d 7               &amp;           7 / &amp;",
+		/* 38  56 8 */"38 38 38 29 d 8               &lowast;        8 / *",
+		/* 39  57 9 */"39 39 39 2a d 9               (               9 / (",
+		/* 3a  58 : */"00 00 bb 00 f",
+		/* 3b  59 ; */"ba 3b 3b 6b b ;               :               ; / :",
+		/* 3c  60 < */"bc 3c ac 8a b ,               &lt;            , / &lt;",
+		/* 3d  61 = */"bb 3d 3d 2d b =               +               = / +",
+		/* 3e  62 > */"be 3e ae 8b b .               &gt;            . / &gt;",
+		/* 3f  63 ? */"bf 3f af 8c b /               ?               / / ?",
+		/* 40  64 @ */"c0 40 a7 6c b '               @               ' / @",
+		/* 41  65 A */"41 41 c1 62 a                 A               Latin Letter a / A",
+		/* 42  66 B */"42 42 c2 87 a                 B               Latin Letter b / B",
+		/* 43  67 C */"43 43 c3 85 a                 C               Latin Letter c / C",
+		/* 44  68 D */"44 44 c4 64 a                 D               Latin Letter d / D",
+		/* 45  69 E */"45 45 c5 44 a                 E               Latin Letter e / E",
+		/* 46  70 F */"46 46 c6 65 a                 F               Latin Letter f / F",
+		/* 47  71 G */"47 47 c7 66 a                 G               Latin Letter g / G",
+		/* 48  72 H */"48 48 c8 67 a                 H               Latin Letter h / H",
+		/* 49  73 I */"49 49 c9 49 a                 I               Latin Letter i / I",
+		/* 4a  74 J */"4a 4a ca 68 a                 J               Latin Letter j / J",
+		/* 4b  75 K */"4b 4b cb 69 a                 K               Latin Letter k / K",
+		/* 4c  76 L */"4c 4c cc 6a a                 L               Latin Letter l / L",
+		/* 4d  77 M */"4d 4d cd 89 a                 M               Latin Letter m / M",
+		/* 4e  78 N */"4e 4e ce 88 a                 N               Latin Letter n / N",
+		/* 4f  79 O */"4f 4f cf 4a a                 O               Latin Letter o / O",
+		/* 50  80 P */"50 50 d0 4b a                 P               Latin Letter p / P",
+		/* 51  81 Q */"51 51 d1 42 a                 Q               Latin Letter q / Q",
+		/* 52  82 R */"52 52 d2 45 a                 R               Latin Letter r / R",
+		/* 53  83 S */"53 53 d3 63 a                 S               Latin Letter s / S",
+		/* 54  84 T */"54 54 d4 46 a                 T               Latin Letter t / T",
+		/* 55  85 U */"55 55 d5 48 a                 U               Latin Letter u / U",
+		/* 56  86 V */"56 56 d6 86 a                 V               Latin Letter v / V",
+		/* 57  87 W */"57 57 d7 43 a                 W               Latin Letter w / W",
+		/* 58  88 X */"58 58 d8 84 a                 X               Latin Letter x / X",
+		/* 59  89 Y */"59 59 d9 47 a                 Y               Latin Letter y / Y",
+		/* 5a  90 Z */"5a 5a da 83 a                 Z               Latin Letter z / Z",
+		/* 5b  91 [ */"db 5b 5b 4c b [               {               [ / {",
+		/* 5c  92 \ */"dc 5c 5c 82 b &#x5c;          &brvbar;        &#x5c; / &brvbar;",
+		/* 5d  93 ] */"dd 5d 5d 4d b ]               }               ] / }",
+		/* 5e  94 ^ */"df 5e b6 21 b ` &#x7c;        &not;           ` &#x7c; / &not;",
+		/* 5f  95 _ */"bd 5f ad 2c b -               _               - / _",
+		/* 60  96 ` */"60 60 60 ab 5 Ins             0               Numeric 0",
+		/* 61  97 a */"61 61 41 8f 5 End             1               Numeric 1",
+		/* 62  98 b */"62 62 42 90 5 &darr;          2               Numeric 2",
+		/* 63  99 c */"63 63 43 91 5 PgDn            3               Numeric 3",
+		/* 64 100 d */"64 64 44 6e 5 &larr;          4               Numeric 4",
+		/* 65 101 e */"65 65 45 6f 5                 5               Numeric 5",
+		/* 66 102 f */"66 66 46 70 5 &rarr;          6               Numeric 6",
+		/* 67 103 g */"67 67 47 52 5 Home            7               Numeric 7",
+		/* 68 104 h */"68 68 48 53 5 &uarr;          8               Numeric 8",
+		/* 69 105 i */"69 69 49 54 5 PgUp            9               Numeric 9",
+		/* 6a 106 j */"6a 6a 4a 34 6 &lowast;        &lowast;        Numeric &lowast;",
+		/* 6b 107 k */"6b 6b 4b 55 6 +               +               Numeric +",
+		/* 6c 108 l */"00 00 4c 00 f",
+		/* 6d 109 m */"6d 6d 4d 35 6 -               -               Numeric -",
+		/* 6e 110 n */"6e 6e 4e ac 5 Del             .               Numeric .",
+		/* 6f 111 o */"6f 6f 4f 33 6 /               /               Numeric /",
+		/* 70 112 p */"70 70 50 02 4 F1              F1              F1",
+		/* 71 113 q */"71 71 51 03 4 F2              F2              F2",
+		/* 72 114 r */"72 72 52 04 4 F3              F3              F3",
+		/* 73 115 s */"73 73 53 05 4 F4              F4              F4",
+		/* 74 116 t */"74 74 54 06 4 F5              F5              F5",
+		/* 75 117 u */"75 75 55 07 4 F6              F6              F6",
+		/* 76 118 v */"76 76 56 08 4 F7              F7              F7",
+		/* 77 119 w */"77 77 57 09 4 F8              F8              F8",
+		/* 78 120 x */"78 78 58 0a 4 F9              F9              F9",
+		/* 79 121 y */"79 79 59 0b 4 F10             F10             F10",
+		/* 7a 122 z */"7a 7a 5a 0c 4 F11             F11             F11",
+		/* 7b 123 { */"7b 7b db 0d 4 F12             F12             F12",
+		/* 7c 124 | */"00 00 dc 00 f",
+		/* 7d 125 } */"00 00 dd 00 f",
+		/* 7e 126 ~ */"00 00 de 00 f",
+		/* 7f 127   */"a3 b3 a3 00 b _               &pound;         _ / &pound;",
+		/* 80 128   */"ff 00 ff 00 0"
+	],
+
+	sATOMLookUp, 
+
+	aATOMKeys =
+	[
+		//		K  M  A RC G L               U               N
+		/* 00   0   */"00 00 c0 00 0 [Reserved]",
+		/* 01   1   */"01 01 41 62 2 SHIFT           SHIFT           Left Shift",
+		/* 02   2   */"02 02 42 42 2 CTRL            CTRL            Ctrl",
+		/* 03   3   */"03 09 43 6e 2 REPT            REPT            Repeat",			// We could swap this and the next entry since Alt Gr is more
+		/* 04   4   */"04 09 44 00 2 [Atom REPEAT]                   [PC Alt Graphics]",	// reliable than Alt in IE but would this mean ATOM / BBC think
+		/* 05   5   */"00 01 45 6d 2 SHIFT           SHIFT           Right Shift",		// that the Ctrl key is being pressed? Send Ctrl Up to ATOM/BEEB?
+		/* 06   6   */"00 00 46 00 f [Free]                          [PC Right Ctrl]",
+		/* 07   7   */"07 45 47 00 e [Atom DELETE]                   [PC Delete]",
+		/* 08   8   */"08 45 08 2f e DELETE          DELETE          Delete",
+		/* 09   9   */"09 46 09 22 e COPY            COPY            Copy",
+		/* 0a  10   */"0a 46 4a 00 e [Atom COPY]                     [PC Insert]",
+		/* 0b  11   */"00 00 4b 00 f [Free]                          [PC Function]",
+		/* 0c  12   */"0c bb 4c 00 e [Atom COPY]                     [PC Numeric 5]",
+		/* 0d  13   */"0d 47 0d 4f 3 RETURN          RETURN          Return",
+		/* 0e  14   */"00 47 4e 00 3 [Atom RETURN]                   [PC Numeric Enter]",
+		/* 0f  15   */"1d 53 4f 41 c &#x2195;        &#x2195;        Cursor Up / Down",
+		/* 10  16   */"1e 54 50 21 c &harr;          &harr;          Cursor Right / Left",
+		/* 11  17   */"00 00 51 00 f [Free]                          [PC Home]",
+		/* 12  18   */"12 46 52 00 e [Atom COPY]                     [PC End]",
+		/* 13  19   */"13 0a 53 0f 1 BREAK           BREAK           Break",
+		/* 14  20   */"14 55 54 61 2 LOCK            LOCK            Lock",
+		/* 15  21   */"00 00 55 00 f [Free]                          [PC Scroll Lock]",
+		/* 16  22   */"00 00 56 00 f [Free]                          [PC Num Lock]",
+		/* 17  23   */"00 00 57 00 f [Free]                          [PC Left Windows]",
+		/* 18  24   */"00 00 58 00 f [Free]                          [PC Right Windows]",
+		/* 19  25   */"00 00 59 00 f [Free]                          [PC Properties]",
+		/* 1a  26   */"00 00 5a 00 f [Free]                          [PC Page Down]",
+		/* 1b  27   */"1b 71 1b 01 3 ESC             ESC             Escape",
+		/* 1c  28   */"1c ad 5c 00 c                                 [PC Cursor Left]",
+		/* 1d  29   */"9e 54 5d 00 c                                 [PC Shift+Cursor Right]",
+		/* 1e  30   */"9d 53 b6 00 c                                 [PC Shift+Cursor Up]",
+		/* 1f  31   */"1f ae ad 00 c                                 [PC Cursor Down]",
+		/* 20  32   */"20 5a 20 81 b                                 Space",
+		/* 21  33 ! */"00 00 b1 00 f [Free]                          [PC Shift+1]",
+		/* 22  34 " */"00 00 b2 00 f [Free]                          [PC Shift+2]",
+		/* 23  35 # */"23 c0 b3 00 b 3               #               3 / #",
+		/* 24  36 $ */"00 00 b4 00 f [Free]                          [PC Shift+4]",
+		/* 25  37 % */"00 00 b5 00 f [Free]                          [PC Shift+5]",
+		/* 26  38 & */"b7 c9 b7 00 b [Atom 6 / &]                    [PC Shift+6]",
+		/* 27  39 ' */"40 ca 27 00 b 7               '               7 / '",
+		/* 28  40 ( */"b0 cc b9 00 b [Atom 8 / (]                    [PC Shift+8]",
+		/* 29  41 ) */"b9 cb b0 00 b [Atom 9 / )]                    [PC Shift+9]",
+		/* 2a  42 * */"b8 cd b8 00 b :               &lowast;        : / &lowast;",
+		/* 2b  43 + */"bd ce bd 00 b =               +               = / +",
+		/* 2c  44 , */"3c 32 2c 6a b ,               &lt;            , / &lt;",
+		/* 2d  45 - */"5f 31 2d 0c b -               =               - / =",
+		/* 2e  46 . */"3e 2a 2e 6b b .               &gt;            . / &gt;",
+		/* 2f  47 / */"3f 29 2f 6c b /               ?               / / ?",
+		/* 30  48 0 */"30 44 30 0b d 0               0               0",
+		/* 31  49 1 */"31 43 31 02 d 1               !               1 / !",
+		/* 32  50 2 */"32 42 32 03 d 2               &quot;          2 / &quot;",
+		/* 33  51 3 */"33 41 33 04 d 3               #               3 / #",
+		/* 34  52 4 */"34 3a 34 05 d 4               $               4 / $",
+		/* 35  53 5 */"35 39 35 06 d 5               %               5 / %",
+		/* 36  54 6 */"36 38 36 07 d 6               &amp;           6 / &amp;",
+		/* 37  55 7 */"37 37 37 08 d 7               '               7 / '",
+		/* 38  56 8 */"38 36 38 09 d 8               (               8 / (",
+		/* 39  57 9 */"39 35 39 0a d 9               )               9 / )",
+		/* 3a  58 : */"bb cd bb 0d b :               &lowast         : / &lowast;",
+		/* 3b  59 ; */"3b 33 3b 4c b ;               +               ; / +",
+		/* 3c  60 < */"00 00 ac 00 f [Free]                          [PC Shift+,]",
+		/* 3d  61 = */"3d d0 3d 00 b -               =               - / =",
+		/* 3e  62 > */"00 00 ae 00 f [Free]                          [PC Shift+.]",
+		/* 3f  63 ? */"5e d9 af 00 b @               @               @ / `",
+		/* 40  64 @ */"c0 d9 a7 2d b @               @               @ / `",
+		/* 41  65 A */"41 27 41 43 a A               A               Latin Letter A / a",
+		/* 42  66 B */"42 26 42 67 a B               B               Latin Letter B / b",
+		/* 43  67 C */"43 25 43 65 a C               C               Latin Letter C / c",
+		/* 44  68 D */"44 24 44 45 a D               D               Latin Letter D / d",
+		/* 45  69 E */"45 23 45 25 a E               E               Latin Letter E / e",
+		/* 46  70 F */"46 22 46 46 a F               F               Latin Letter F / f",
+		/* 47  71 G */"47 21 47 47 a G               G               Latin Letter G / g",
+		/* 48  72 H */"48 1a 48 48 a H               H               Latin Letter H / h",
+		/* 49  73 I */"49 19 49 2a a I               I               Latin Letter I / i",
+		/* 4a  74 J */"4a 18 4a 49 a J               J               Latin Letter J / j",
+		/* 4b  75 K */"4b 17 4b 4a a K               K               Latin Letter K / k",
+		/* 4c  76 L */"4c 16 4c 4b a L               L               Latin Letter L / l",
+		/* 4d  77 M */"4d 15 4d 69 a M               M               Latin Letter M / m",
+		/* 4e  78 N */"4e 14 4e 68 a N               N               Latin Letter N / n",
+		/* 4f  79 O */"4f 13 4f 2b a O               O               Latin Letter O / o",
+		/* 50  80 P */"50 12 50 2c a P               P               Latin Letter P / p",
+		/* 51  81 Q */"51 11 51 23 a Q               Q               Latin Letter Q / q",
+		/* 52  82 R */"52 7a 52 26 a R               R               Latin Letter R / r",
+		/* 53  83 S */"53 79 53 44 a S               S               Latin Letter S / s",
+		/* 54  84 T */"54 78 54 27 a T               T               Latin Letter T / t",
+		/* 55  85 U */"55 77 55 29 a U               U               Latin Letter U / u",
+		/* 56  86 V */"56 76 56 66 a V               V               Latin Letter V / v",
+		/* 57  87 W */"57 75 57 24 a W               W               Latin Letter W / w",
+		/* 58  88 X */"58 74 58 64 a X               X               Latin Letter X / x",
+		/* 59  89 Y */"59 73 59 28 a Y               Y               Latin Letter Y / y",
+		/* 5a  90 Z */"5a 72 5a 63 a Z               Z               Latin Letter Z / z",
+		/* 5b  91 [ */"5b 59 5b 4d b [               [               [ / {",
+		/* 5c  92 \ */"5c 58 5c 2e b &#x5c;          &#x5c;          &#x5c; / &#x7c;",
+		/* 5d  93 ] */"5d 57 5d 4e b ]               ]               ] / }",
+		/* 5e  94 ^ */"b6 ab b6 0e b &uarr;          &uarr;          &uarr; / &tilde;",
+		/* 5f  95 _ */"bd 00 ad 00 b -               _               - / _",
+		/* 60  96 ` */"60 44 60 00 5 Ins             0               Numeric 0",
+		/* 61  97 a */"61 43 c1 00 5 End             1               Numeric 1",
+		/* 62  98 b */"62 42 c2 00 5 &darr;          2               Numeric 2",
+		/* 63  99 c */"63 41 c3 00 5 PgDn            3               Numeric 3",
+		/* 64 100 d */"64 3a c4 00 5 &larr;          4               Numeric 4",
+		/* 65 101 e */"65 39 c5 00 5                 5               Numeric 5",
+		/* 66 102 f */"66 38 c6 00 5 &rarr;          6               Numeric 6",
+		/* 67 103 g */"67 37 c7 00 5 Home            7               Numeric 7",
+		/* 68 104 h */"68 36 c8 00 5 &uarr;          8               Numeric 8",
+		/* 69 105 i */"69 35 c9 00 5 PgUp            9               Numeric 9",
+		/* 6a 106 j */"6a cd ca 00 6 *               *               Numeric *",
+		/* 6b 107 k */"6b ce cb 00 6 +               +               Numeric +",
+		/* 6c 108 l */"00 00 cc 00 f [Free]                          [PC Shift+L]",
+		/* 6d 109 m */"6d 31 cd 00 6 -               -               Numeric -",
+		/* 6e 110 n */"6e 2a ce 00 5 Del             .               Numeric .",
+		/* 6f 111 o */"6f 29 cf 00 6 /               /               Numeric /",
+		/* 70 112 p */"70 00 d0 00 4 F1              F1              Atomic Theory and Practice	(Manual) tab",
+		/* 71 113 q */"71 00 d1 00 4 F2              F2              Atomic Theory and Practice	(Manual) tab",
+		/* 72 114 r */"72 00 d2 00 4 F3              F3              Virtual CPU - Chip layout / Schematic layout tabs",
+		/* 73 115 s */"73 00 d3 00 4 F4              F4              Swap keyboard layout (Normal / Alternate)",
+		/* 74 116 t */"74 00 d4 00 4 F5              F5              CPU Speed (Normal / Fastest)",
+		/* 75 117 u */"75 00 d5 00 4 F6              F6              ROM selection list / tab",
+		/* 76 118 v */"76 00 d6 00 4 F7              F7              Disk menu / tab",
+		/* 77 119 w */"77 00 d7 00 4 F8              F8              Tape menu / tab",
+		/* 78 120 x */"78 00 d8 00 4 F9              F9              Options tab",
+		/* 79 121 y */"79 00 d9 00 4 F10             F10             Monitor - ATOM Mode; Full dissasembler; Assembler tabs",
+		/* 7a 122 z */"7a 00 da 00 4 F11             F11             Toggle fullscreen mode",
+		/* 7b 123 { */"7b 0a db 00 4 F12             F12             ATOM 'BREAK' key",
+		/* 7c 124 | */"00 00 dc 00 f [Free]                          [PC Shift+\]",
+		/* 7d 125 } */"00 00 dd 00 f [Free]                          [PC Shift+]]",
+		/* 7e 126 ~ */"00 00 de 00 f [Free]                          [PC Shift+]",
+		/* 7f 127   */"00 00 a3 00 f [Free]          [Code B3]       [PC Shift+4]", // BBC Key Category b (Punct) _ / &pound;
+		/* 80 128   */"ff 00 ff 00 0"
+	], 
+
+	aKeys = [B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B],
+
+// Character definition
+
+	aChars =
+	[
+		"1C22021A2A2A1C", // @
+		"081422223E2222", // A
+		"3C12121C12123C", // B
+		"1C22202020221C", // C
+		"3C12121212123C", // D
+		"3E20203820203E", // E
+		"3E20203C202020", // F
+		"1E20202622221E", // G
+		"2222223E222222", // H
+		"1C08080808081C", // I
+		"0202020222221C", // J
+		"22242830282422", // K
+		"2020202020203E", // L
+		"22362A2A222222", // M
+		"22322A26222222", // N
+		"3E22222222223E", // O
+		"3C22223C202020", // P
+		"1C2222222A241A", // Q
+		"3C22223C282422", // R
+		"1C22100804221C", // S
+		"3E080808080808", // T
+		"2222222222221C", // U
+		"22222222141408", // V
+		"2222222A2A3622", // W
+		"22221408142222", // X
+		"22221408080808", // Y
+		"3E02040810203E", // Z
+		"1C10101010101C", // [
+		"20201008040202", // \
+		"1C04040404041C", // ]
+		"081C2A08080808", // ^
+		"0008103E100800", // <-
+
+		"00000000000000", // Space
+		"08080808080008", // !
+		"14140000000000", // "
+		"14143600361414", // #
+		"081E201C023C08", // $
+		"32320408102626", // %
+		"102828102A241A", // &
+		"0C0C0C00000000", // '
+		"04081010100804", // (
+		"10080404040810", // )
+		"00081C3E1C0800", // *
+		"0008083E080800", // +
+		"0000000C0C0408", // ,
+		"0000003E000000", // -
+		"00000000000C0C", // .
+		"02020408102020", // /
+		"18242424242418", // 0
+		"0818080808081C", // 1
+		"1C22021C20203E", // 2
+		"1C22020C02221C", // 3
+		"040C143E040404", // 4
+		"3E203C0202221C", // 5
+		"1C20203C22221C", // 6
+		"3E020408102020", // 7
+		"1C22221C22221C", // 8
+		"1C22221E02021C", // 9
+		"000C0C000C0C00", // :
+		"0C0C000C0C0408", // ;
+		"04081020100804", // <
+		"00003E003E0000", // =
+		"20100804081020", // >
+		"18240408080008"  // ?
+	],
+
+// Colour palette definition
+
+	bScanLn = 1,
+	bOrange	= 1,
+	bBuff	= 1,
+	bBW	= 0,
+
+	aPal =
+	[
+		"#171717",
+		"#f00",
+		"#0f0",
+		"#ff0",
+		"#00f",
+		"#f0f",
+		"#0ff",
+		"#fff",
+		"#ddd",
+		"#7f7f7f",
+		"#1f1f1f",
+		bOrange	? "#ff7f00" : "#f00",
+		bBuff	? "#fff0f0" : "#fff"
+	],
+
+// Miscelanious definitions
+
+ 	bTrans = 0, // This does not work at the moment
+	SX = 4, 
+	SY = 4, 
+	XS = SX, 
+	YS = SY, 
+	MX = 2, 
+	MY = 3, 
+	MXC = 4, 
+	MYC = 3, 
+	aF, 
+	aP, 
+	fP,
+
+	aLen = [512, 1024, 1024, 2048, 1536, 3072, 3072, 6144, 6144],
+	c1, 
+	c2, 
+	c3, 
+	c4, 
+	c5, 
+	e1, 
+	e2, 
+	e3, 
+	e4, 
+	e5, 
+	$v,
+
+	bCanvas = false, 
+	nMode = 0, 
+	nPal = 1, 
+	nLen, 
+	// bSpkr = 0, 
+	bSync = 0, 
+	nKeys = 0,
+
+	onEvent=(function(a){return function(o,e,f,c){if(!a)a=o.addEventListener?function(o,e,f,c){o.addEventListener(e,f,c)}:o.attachEvent?function(o,e,f,c){o.attachEvent("on"+e,f),c}:function(o,e,f){o["on"+e]=f};a(o,e,f,c)}}()),
+
+	sBase64	= "ABCDEFGHIJKLMNOPQRSTUVWXYZ";	// All capital letters
+	sBase64	+= sBase64.toLowerCase();	// All lower case letters
+	sBase64	+= "0123456789+/=";		// All numbers followed by + / and =
+
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+; Base 64 decoding routines
+;
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+function fB64E(sInput, sNL) // See also "on-the-fly" Base64 encoding in png.js
+{
+	var sOutput = "", nChar1, nChar2, nChar3, nCode1, nCode2, nCode3, nCode4, nI = 0, nL = sInput.length, nNL = sNL ? nLen64 : 0;
+	while (nI < nL) {
+		nChar1 = sInput.charCodeAt(nI++);
+		nChar2 = sInput.charCodeAt(nI++);
+		nChar3 = sInput.charCodeAt(nI++);
+		nCode1 =   nChar1			>> 2;
+		nCode2 = ((nChar1 & 0x03)	<< 4) | (nChar2 >> 4);
+		nCode3 = ((nChar2 & 0x0F)	<< 2) | (nChar3 >> 6);
+		nCode4 =   nChar3 & 0x3F;	// Decimal 63 = nLen64 - 1 = Mask for 0..63 = 64 characters :)
+		if (isNaN(nChar2))
+			nCode3 = nCode4 = 64;
+			else if (isNaN(nChar3)) nCode4 = 64;
+		sOutput += sBase64.charAt(nCode1) + sBase64.charAt(nCode2) + sBase64.charAt(nCode3) + sBase64.charAt(nCode4); }
+	return sOutput;
+}
+
+function D64(s)
+{
+	var c, i, n, r, C;
+
+	function b(S)
+	{
+		C = c;
+		c = s.charCodeAt(i++);
+		c += c - 61 ? c > 64 ? c > 90 ? -71 : -65 : c > 47 ? 4 : c - 43 ? 16 : 19 : 3;
+		return c << S;
+	}
+	
+	function B(S, v)
+	{
+		return v > 63 ? "" : String.fromCharCode(n >> S & 255);
+	}
+
+	for (i = 0, r = ""; i < s.length; r += B(16) + B(8, C) + B(0, c))
+		n = b(18) | b(12) | b(6) | b(0);
+	return r;
+}
+
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+; fInitAddr()
+;
+; Initialize memorymap depending on var bBBC :
+;
+;               BBC mode        Atom mode
+;  -----------------------------------------
+;  RAM      0x0000 - 0x3FFF  0x0000 - 0x7FFF
+;  VIDEO    0x4000 - 0x57FF  0x8000 - 0x97FF
+;  Unused   0x6000 - 0x6FFF  0x9800 - 0xAFFF
+;  PPIA     0x7000 - 0x7FFF  0xB000 - 0xBFFF
+;  ROM      0x8000 - 0xFFFF  0xC000 - 0xFFFF
+;
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+function fInitAddr()
+{
+	if (bBBC) {
+		HIMEM		= 0x4000;
+		PPIA_ADDR	= 0x7000;
+		ROM		= 0x8000;
+		LDB		= LDBB;
+		STB		= STBB; }
+	else {
+		HIMEM		= 0x8000;
+		PPIA_ADDR	= 0xB000;
+		ROM		= 0xC000;
+		LDB		= LDBA;
+		STB		= STBA; }
+}
+
+/*
+function fPad(s, n)
+{
+	var l = (s = "000000000000" + s).length; return s.substr(l-n+1);
+}
+*/
+
+function fKeyLabel(nCode, aKeyData)
+{
+	return (nCode = (aKeyData || aPCKeys) [nCode & 0x7f]).L ? nCode.L : nCode.U;
+}
+
+function fKeyName(nCode, aKeyData)
+{
+	return (aKeyData || aPCKeys) [nCode & 0x7f].N;
+}
+
+// This needs an overhaul / rationalising! :-/
+
+function fAdd(s, a)
+{
+	return a ? (s ? s + '+' + a : a) : s;
+}
+
+function fKeyMods()
+{
+	sMods = fAdd("",    nShift ?  fKeyLabel(CODE_SHIFT)  : "");
+	sMods = fAdd(sMods, nCtrl  ?  fKeyLabel(CODE_CTRL)   : "");
+	sMods = fAdd(sMods, nAlt   ?  fKeyLabel(CODE_ALT)    : "");
+	sMods = fAdd(sMods, nAltGr ?  fKeyLabel(CODE_ALT_GR) : "");
+}
+
+function fKeyMap(nCode)
+{
+	var nOrd = fKeyOrd(nCode, sATOMLookUp); return nOrd - INVALID ? nOrd : fKeyOrd(nCode & 0x7f, sATOMLookUp);
+}
+
+function fKeyStatus(nCode)
+{
+	var nKey = nCode & 0xff, nOrd = fKeyMap(nKey), sStatus;
+	sStatus = (nKey >= CODE_SHIFT && nKey <= CODE_ALT_GR ? sMods : fAdd(sMods, fKeyName(nKey))) + ' ' + (nCode & 0x800 ? "down" : "up") + " Key Code: " + HEX(nKey);
+	nCode = nOrd - INVALID ? (nCode & 0x80 ? 256-aATOMKeys [nOrd].M : aATOMKeys [nOrd].M-1) : 0;
+	sStatus += " ATOM Key Code: " + HEX(nCode) + ' ' + (nCode & 0x80 ? fKeyLabel(CODE_SHIFT) : "") + fKeyName(nOrd, aATOMKeys);
+	return sStatus;
+}
+
+function fKeyOrd(nOrd, sLookUp)
+{
+	nOrd = sLookUp.indexOf(String.fromCharCode(nOrd));
+//	if(nOrd==112)fHexDump();
+	return nOrd >= 0 && nOrd < 128 ? nOrd : INVALID;
+}
+
+function fHexDump()
+{
+	for (s = "", i = 0; i < 0x216; ++i) {
+		if (!(i & 7)) s += '\n' + HEXWORD(HIMEM + i - 22) + ' ';
+		s += HEXBYTE(PEEK(HIMEM + i - 22) & 0xff) + ' '; }
+	document.writeln("<pre>" + s);
+}
+
+function HEXBYTE(n)	{ return (n < 16 ? '0' : "") + n.toString(16).toUpperCase();}
+function HEXWORD(n)	{ return(PAD(n.toString(16).toUpperCase(), '0', 4));}
+function PAD(n,c,w)	{ n = n + ""; while (n.length < w) n = c + n; return n;}
+function PEEK(a)	{ return MEM [a];}
+
+function fKeyGet(e, bDown)
+{
+	nOrd = fKeyOrd(nKeyCode = e.keyCode, sPCLookUp);
+	nCode = nOrd - INVALID ? aPCKeys [nOrd].M : nOrd;
+//	if (bDown && nKeyCode == 116) history.go(0); return; // If we arent using F5. Come back to events we don't want cancelled and menu keys later
+	if (nCode == CODE_ALT) {
+		if (bDown) {
+			if (nCtrl)	{ nCode = CODE_ALT_GR; nCtrl = 0; nAlt = 0; } }
+		else
+			if (nAltGr)	{ nCode = CODE_ALT_GR; nCtrl = 0; nAlt = 0; } }
+//	if (nCode == CODE_ALT) nCode = 0; // This may be needed as it jumps out of browser leaving alt stuck down
+	if (!bDown) fKeyMods();
+	switch (nCode) {
+		case CODE_SHIFT:	nShift = bDown ? SHIFT  : 0; break;
+		case CODE_CTRL:		nCtrl  = bDown ? CTRL   : 0; break;
+		case CODE_ALT:		nAlt   = bDown ? ALT    : 0; break;
+		case CODE_ALT_GR:	nAltGr = bDown ? ALT_GR : 0; }
+	if (bDown) fKeyMods();
+	return nCode >= INVALID ? 0 : ((bDown ? PRESSED : 0) | nShift | nCtrl | nAlt | nAltGr) << 7 | nCode;
+}
+
+function fKeyEvent(e, nStatus)
+{
+	if (bInput)
+		return;
+	fKey(e, nStatus);
+	return fEndEvent(e, 3);
+}
+
+function fAddEvent(oObj, sEvent, fHandler, bCapture)
+{
+	onEvent(oObj || document, sEvent, fHandler, bCapture);
+}
+
+function fEndEvent(e,n)
+{
+	n=(n||0)&3;
+	if (n & 1)
+		fStopBubble(e);
+	if (n & 2)
+		fStopDefault(e);
+	return n ? false : true;
+}
+
+function fStopBubble(e)	
+{
+	if (e.stopPropagation) 
+		e.stopPropagation();
+	else e.cancelBubble = true;
+}
+
+function fStopDefault(e)
+{
+	if (e.preventDefault)
+		e.preventDefault();
+	else e.returnValue  = false;
+}
+
+function r(x,y,w,h)
+{
+	h*=x/w;
+	w=Math.floor(x*y/h);
+	h=Math.floor(h);
+	return(x>=y?y>=h:w>=x)?[x,h]:[w,y]
+}
+
+function fDisplay()
+{
+	if(bCanvas=fInitCanvas()?1:0)
+		return;
+	var
+		x,
+		y,
+		oCell=document.createElement("b");
+	oCell.className="cBlock cChar"+(bGreen?"Grn":"");
+	oScr=$("dTxtScreen");
+	for(y=0;y<ROWS;++y)
+		for(x=0;x<COLS;++x)
+		{
+			oCell.id=fCellId(y,x);
+			oScr.appendChild(oCell.cloneNode(false));
+		}
+}
+
+function fTxtScreen()
+{
+	var x,y,s;
+	if(bCanvas)
+		return;
+	for(y=0;y<ROWS;++y)
+		for(x=0;x<COLS;++x)
+		{
+			s=fCell(y,x).style;
+		s.width=FW+"px";
+		s.height=FH+"px";
+		s.top=(y*FH)+"px";
+		s.left=(x*FW)+"px";
+		s.backgroundPosition=fChrPos(LDB(HIMEM+(y<<5)+x))
+	}
+}
+
+function fChr(r,c,v)
+{
+	fCell(r,c).style.backgroundPosition=fChrPos(v)
+}
+
+function fCell(r,c)
+{
+	return $(fCellId(r,c))
+}
+
+function fCellId(r,c)
+{
+	return 'r'+r+'c'+c
+}
+
+function fChrPos(c)
+{
+	return '-'+((c&31)*FW)+"px -"+((c>>5)*FH)+"px"
+}
+
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+; PIA 8255 functions
+;
+; Port A - #B000
+;        Output bits:      Function:
+;             O -- 3     Keyboard row
+;             4 -- 7     Graphics mode
+; 
+; Port B - #B001
+;        Input bits:       Function:
+;             O -- 5     Keyboard column
+;               6        CTRL key (low when pressed)
+;               7        SHIFT keys {low when pressed)
+; 
+; Port C - #B002
+;        Output bits:      Function:
+;             O          Tape output
+;             1          Enable 2.4 kHz to cassette output
+;             2          Loudspeaker
+;             3          Not used
+; 
+;        Input bits:       Function:
+;             4          2.4 kHz input
+;             5          Cassette input
+;             6          REPT key (low when pressed)
+;             7          60 Hz sync signal (low during flyback)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+function fPIAR(a,v)
+{
+	return a-1?aPPIA[a]:aKeys[aPPIA[0]&15]
+}
+
+function fPIAW(a,v)
+{
+	if(a<3)aPPIA[a]=a-2?v:(aPPIA[a]&243)|(v&12);
+		      a?a-2?0:fMode(nMode,v&8?1:0):fMode(v>>4,nPal)
+}
+
+
+function fIOPoll(c)
+{
+	nTapeClk+=c;
+	if(nTapeClk>nTapeHz)
+	{
+		nTapeClk=0;
+		aPPIA[2]^=0x10
+	}
+	fVIAPoll(c)
+}
+
+function fIOR(a,A)
+{
+	return(A=(a>>10)&3)?A-2?0:fVIARead(a):fPIAR(a&3)
+}
+
+function fIOW(a,v)
+{
+	(A=(a>>10)&3)?A-2?0:fVIAWrite(a,v):fPIAW(a&15,v)
+}
+
+function fSpeaker(bOn){/* Sound not yet implemented */}
+
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+; Atom mode memory declaration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+function STBA(a,v,A)
+{
+	a<2048?(MEM[a]=v):					// 0x0000-0x1FFF
+	(A=a>>12)<10?A<2?0:					// 0x2000-0x9FFF
+	(MEM[a]=v,(a-=HIMEM)>=0&&a<nLen?fP(a,v):0):		// ???
+	A-11?0:fIOW(a,v&0xff)					// 0xB000-0xBFFF
+}
+
+function LDBA(a,A)
+{
+	if(a<2560)return MEM[a]					// 0x0000-0x09FF
+	if(a<2688)return(a&=15)==4||a==12?255:0			// 0x0A00-0x0A7F
+	if((A=a>>12)<2)return 0					// 0x0A80-0x1FFF
+	if(A<10)return MEM[a]					// 0x2000-0x9FFF
+	switch(A)
+	{
+		case 10:return sAXR1_ROM.charCodeAt(a-40960)	// 0xA000-0xAFFF
+		case 11:return fIOR(a)&0xff			// 0xB000-0xBFFF
+		case 12:return sABASIC_IC20.charCodeAt(a-49152)	// 0xC000-0xCFFF
+		case 13:return sAFloat_IC21.charCodeAt(a-53248)	// 0xD000-0xDFFF
+		case 14:return sDOSROM_U15.charCodeAt(a-57344)	// 0xE000-0xEFFF
+		case 15:return sABASIC_IC20.charCodeAt(a-57344)	// 0xF000-0xFFFF
+	}
+}
+
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+; BBC mode memory declaration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+function STBB(a,v)
+{
+	return(s=a>>12)<6?(MEM[a]=v,			// 0x0000-0x5FFF
+		(a-=HIMEM)>=0&&a<nLen?fP(a,v):0):	// ???
+		s>6&&s<8?fIOW(a,v&0xff):0		// 0x6000-0x7FFF
+}
+
+function LDBB(a)
+{
+	return(s=a>>12)<6?MEM[a]:			// 0x0000-0x5FFF
+	s<7?0:						// 0x6000-0x6FFF
+	s<8?fIOR(a)&255:				// 0x7000-0x7FFF
+	s<12?sBASIC1_ROM.charCodeAt(a-32768):		// 0x8000-0xBFFF
+	s<15?0:						// 0xC000-0xEFFF
+	sATOM_BBC_BASIC_OS_ROM.charCodeAt(a-61440)	// 0xF000-0xFFFF
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+function fDebug(s)
+{
+	$("dManual").innerHTML=s
+}
+
+function fSprite(a,v)
+{
+	fCell(Math.floor(a/COLS),a&31).style.backgroundPosition=fChrPos(v)
+}
+
+function clearMemory()
+{
+	MEM=[];
+	for(i=0;i<0xA000;MEM[i++]=0);
+	for(i=8;i<13;MEM[i++]=Math.floor(256*Math.random()));
+	for(i=0x100;i<0x200;MEM[i++]=0);
+}
+
+function f60Hz()
+{
+	nSpeed=(nSpeed+nCycles)>>1;
+	/*if(!(nHz=nHz-60?++nHz:0))fDebug(++nT+' '+Math.floor(nSpeed/10000)+'% '+nMode+' '+nLen),nCycles=0;*/
+	fRun()
+}
+
+function fBreak()
+{
+	fVIAReset();
+	RST();
+	if(oClock)clearInterval(oClock);oClock=setInterval(f60Hz, Math.floor(1000 / 60));
+}
+
+function fRun()
+{
+	CLK=0;aPPIA[2]|=0x80;
+	while(CLK<VBL)RUN();
+	aPPIA[2]&=0x7f;
+	while(CLK<SYN)RUN();
+	nCycles+=CLK
+}
+
+function $(e)
+{
+	return document.getElementById(e)
+}
+
+String.prototype.trim=function()
+{
+	return this.replace(/^\s+|\s+$/, "")
+}
+
+function ord(s,i)
+{
+	return s.charCodeAt(i)
+}
+
+function chr(n)
+{
+	return String.fromCharCode(n)
+}
+
+function mid(s,n,l)
+{
+	return s.substr(n,l||s.length-n).trim()
+}
+
+function HEX(n)
+{
+	return((n&=255)<16?'0':"")+ n.toString(16).toUpperCase()
+}
+
+function hex(s,n,l)
+{
+	return parseInt(mid(s,n,l||2),16)
+}
+
+function reg(k,i,s,p,l,L)
+{
+	if(typeof(k)=="object" && k.length>127 && typeof(k[0])=="string") 
+		for(i=0,l=L="";i<k.length;++i)
+			{
+				k[i]={K:hex(s=k[i],p=0),M:hex(s,p+=3),A:hex(s,p+=3),RC:hex(s,p+=3),G:hex(s,p+=3,1),L:mid(s,p+=2,16),U:mid(s,p+=16,16),N:mid(s,p+=16)}
+	l+=String.fromCharCode(k[i].K);L+=String.fromCharCode(k[i].A)}return l;
+}//+L;}
+
+//writemem(a,v){a-t?v-o?s(t,v):o=m[t=a]:0}
+
+szBuffer=""
+
+function fATOMPress(nKey)
+{
+	if (nKey) szBuffer += String.fromCharCode(nKey >> 8) + String.fromCharCode(nKey & 0xFF);
+	if (!szBuffer) return;
+	nKey = szBuffer.charCodeAt(0) << 8 | szBuffer.charCodeAt(1);
+	szBuffer = szBuffer.substring(2);
+
+	var
+		N,
+		B=1,
+		R=0,
+		C=fKeyMap(nKey&0xff),
+		S=nKey&0x80?1:0,
+		D=nKey&0x800?1:0;
+
+	// R = Row, C = InKey Minus Code / Column
+	if(C==INVALID)return;
+	C=N=aATOMKeys[C].M-1;N=S?~N:N;
+	if(C&0x80){S=1;C=255-C;}
+	C=(R=C&15,C>>=4)?5-C%7:R-2?R^7:8
+	if(R==9&&C==14)return fBreak();
+	if(S)D?(aKeys[0]&=0x7f):(aKeys[0]|=0x80);
+	if(R==1&&C==6)D?(aKeys[0]&=0xbf):(aKeys[0]|=0x40);
+	B<<=C;if(D)aKeys[R]&=255-B;else aKeys[R]|=B;
+}
+
+//function fSetKey(R,V){}
+
+function fResize()
+{
+	FW = 32;
+	FH = 48;
+	fTxtScreen();
+	return;
+
+	var
+		d = $("dANSI"),
+		M = 10,
+		W = document.body.clientWidth,
+		y = H = document.body.clientHeight - (M << 1),
+		X = Math.floor(W * 0.75),
+		x = X - M,
+		w = COLS * FONT_WIDTH,
+		h = ROWS * FONT_HEIGHT,
+		s = r(x, y, w, h);
+
+	w = s [0] < COLS ? 1 : Math.floor(s [0] / COLS);
+	h = ROWS * Math.floor(w * FONT_HEIGHT / FONT_WIDTH); w *= COLS;
+	x = ((x - w) >> 1) + M;
+	y = ((y - h) >> 1) + M;
+	FW = w / COLS;
+	FH = h / ROWS;
+	FS = FW;
+	// Math.floor(0.5 * Math.sqrt(FW * FW + FH * FH))
+
+	d.style.width	= w + "px";
+	d.style.height	= h + "px";
+	d.style.left	= x + "px";
+	d.style.top	= y + "px";
+
+	fDisplay();
+	fHelloWorld();
+
+	d = $("dIO");
+	d.style.width	= (W - X - (M << 1)) + "px";
+	d.style.height	= h + "px";
+	d.style.left	= (X + M) + "px";
+	d.style.top	= y + "px";
+}
+
+function fKey(e, nStatus)
+{
+	if (bKBEn && nStatus < 3) 
+		fATOMPress(fKeyGet(e, nStatus==1));
+}
+
+function fLoad(sImg, a, e, i, l)
+{
+	a = a || 0x2900; e = e || (a == 0x2900 ? 0xC2B2 : a);
+	if ((sImg = sImg || "") && typeof(sImg) == "string" && (l = (i = i || 0) + (l ? l : sImg.length - i))) {
+		while (i < l) STB(a++, ord(sImg, i++));
+		if (e == 0xC2B2) STB(l = 0x0D, a & 0xFF); STB(++l, a >> 8); } // Store final address in "TOP" on ATOM
+}
+
+function fParseBASIC(sBASIC)
+{
+	var
+		i,
+		l = 0,
+		n,
+		p,
+		s,
+		aBASIC = (sBASIC = sBASIC || "") && typeof(sBASIC) == "string" ? sBASIC.split('\n') : [],
+		nLen = aBASIC.length;
+
+	sBASIC = nLen ? '\r' : "";
+	if (nLen)
+	{
+		for (i = 0; i < nLen; ++i)
+			if ((s = aBASIC [i]) && (n = parseInt(s)) && n > l && n < 32768 && (p = s.indexOf(l = n)) >= 0)
+				sBASIC += chr(n >> 8) + chr(n & 0xFF) + s.substr(p + n.toString().length) + '\r'; 		// | converted to shift \ by caller now
+		sBASIC += chr(0xFF);
+	}	// Terminator byte
+	return sBASIC;
+}
+
+function fTapeRead(sName, sTape)
+{
+	var
+		i = 0,
+		n,
+		s,
+		e,
+		l,
+		f = i,
+		c,
+		p = i,
+		nSize,
+		aCat = [i];
+
+	sName = sName || "";
+	nSize = (sTape = sTape || "") && typeof(sTape) == "string" ? sTape.length : i;
+	while ((nSize - i) > 22)
+	{
+		for (n = "", p = 0; p < 16 && (c = sTape.charCodeAt(i + p++)); n += String.fromCharCode(c)); i += 16;
+		s = sTape.charCodeAt(i++) | sTape.charCodeAt(i++) << 8;
+		e = sTape.charCodeAt(i++) | sTape.charCodeAt(i++) << 8;
+		l = sTape.charCodeAt(i++) | sTape.charCodeAt(i++) << 8;
+		aCat [++f] = {n: n, s: s, e: e, l: l, f: 0, d: sTape.substr(i, l)}; i += l;
+	}
+	aCat [i = 0] = {n: sName, s: i, e: i, l: f, f: 0, d: ""};
+	return aCat;
+}
+
+function fHelpWin(nErr, nLn)
+{
+	if (oTimer) clearTimeout(oTimer);
+	if (!nErr || nError == nErr) return;
+	nError = nErr;
+	if (bOnline)
+	{
+		sHelp = "\"/manuals/atom/#dErr" + nError + "\"";
+		if (oErrWin)
+			sHelp = "oErrWin.location.href = " + sHelp + ';';
+		else
+			sHelp = "oErrWin = window.open(" + sHelp + ");";
+	}
+	else
+	{
+		for ( var i = 0, l = aErrors.length; i < l && aErrors [i].nCode != nError; ++i);
+			sHelp = i - l ? "Error " + nError + ": " + aErrors [i].sName : "Unknown error: " + nError;
+			if (nLn) sHelp += " at line " + nLn;
+			sHelp = "alert(\"" + sHelp + "\");";
+	}
+	oTimer = setTimeout(sHelp, 1000);
+}
+
+function fHexWord(n)
+{
+	return HEX(n >> 8) + HEX(n & 0xFF)
+}
+
+function fTape(aTape, nFile, s, i, l)
+{
+	fLoad(aTape [nFile].d, s ? s : aTape [nFile].s, aTape [nFile].e, i, l);
+}
+
+function fDemo(aDemo, nFile)
+{
+	if (!bBBC) fLoad(fParseBASIC(aDemo [nFile]));
+}
+
+function fAction(s)
+{
+	fSetDemo(s == "LOAD" ? $("fSource").value : sSnake)
+	bInput = false;
+	nPal^=1;fMode(0,nPal^1);
+	fLogin();
+	$("dSource").style.display = "none";
+	alert("Loaded " + (s == "LOAD" ? "demo program" : "Snake game") + ". Type OLD and RUN");
+	if (s == "DEMO") $("fSource").value = sSnake;
+}
+
+function fToggle()
+{
+	$("dSource").style.display = "block";
+}
+
+function fSetDemo(s)
+{
+	aDemos [aDemos.length] = s.trim().replace(/\&lt;/gi,'<').replace(/\&gt;/gi,'>').replace(/\&amp;/gi,'&');
+}
+
+var ARGV = new VARG_type();
+
+function VARG_type()	// VARG (Variable ARGument) defaults
+{
+	this.user = "";
+	this.pass = "";
+	this.prog = "kees";
+}
+
+function VARG_get(o)
+{
+	var js = self.location.search.substring(1);
+	if (js) js = js.replace(/=/g, "=\"") + '"';
+	return js == "" ? 0 : eval(o + '.' + unescape(js.replace(/&/g, "\";" + o + '.')));
+}
+
+function fStartUp()
+{
+	VARG_get("ARGV");
+	fInitAddr();
+	clearMemory();
+	fMakeAtomFont();
+	fDisplay();
+	fResize();
+	fMain();
+	fLogin();
+}
+
+function fKeyboard()
+{
+	bInput = true;
+}
+
+var
+	bInput = false,
+	bShow = false;
+
+function fRedirect()
+{
+	fAddEvent(document, "keydown",  function(e){return fKeyEvent(e||window.event,1)}, 0);
+	fAddEvent(document, "keyup",    function(e){return fKeyEvent(e||window.event,2)}, 0);
+	fAddEvent(document, "keypress", function(e){return fKeyEvent(e||window.event,3)}, 0);
+}
+
+function fMain()
+{
+	var
+		d = document,
+		i;
+	fMode(0, 0);
+	sPCLookUp = reg(aPCKeys);
+	sATOMLookUp = reg(aATOMKeys);
+	for (i = 0; i < aLen[0]; ++i)
+		STB(HIMEM + i, Math.floor(256 * Math.random()));
+	window.onresize = fResizeGr;
+	fRedirect();
+	aDemos=[];
+	fSetDemo(sSnake = $("fSource").value);
+	INIT();
+}
+
+var
+	bpb=8,			// Bits per byte
+	ppb=4,			// Pixels per byte
+	bpp=bpb/ppb,		// Bits per pixel
+	bpr=8,			// Bits per row
+	bpc=(256/bpr)|0,	// Bits per column
+	cpc=2,			// Columns per colour
+	rpc=3,			// Rows per colour
+	cols=32,		// Columns
+	rows=256/cols,		// Rows
+	cw=8,			// Column width
+	ch=12;			// Column height
+
+function fInitCanvas()
+{
+	var c,i,j,k,s,
+	x=cw*cols,
+	y=ch*rows*2,
+	WW=window.innerWidth,
+	WH=window.innerHeight;
+
+	YS=(WH/y)|0;
+	XS=(WW/x)|0;
+	XS=(YS=YS<1?1:YS);
+	x*=XS;y*=YS;
+
+	if (bpr*bpc<256)++bpc;
+	if ($v) e5.style.display = "none";
+	if (!(c=fMakeCanvas(SX*bpb*bpr*cpc,SY*bpc*rpc,0)).e) return null;
+	for(e1=c.e,c1=c.c,i=0,j=aPal.length;i<j;++i)aPal[i]=bBW?fBW(aPal[i]):aPal[i];
+	e2=(c=fMakeCanvas(SX*bpb*bpr*cpc,SY*bpc*rpc,0)).e,c2=c.c;
+	e3=(c=fMakeCanvas(SX*cw*cols,SY*ch*rows*2,0)).e,c3=c.c;
+	e4=(c=fMakeCanvas(SX*cw*cols,SY*ch*rows*2,0)).e,c4=c.c;
+	e5=(c=fMakeCanvas(x,y,1)).e,c5=c.c;
+
+	s=e5.style;s.position="absolute";
+	s.left=(((WW/2)|0)-((x/2)|0))+"px";s.top=(((WH/2)|0)-((y/2)|0))+"px";// s.border="1px solid red";
+
+	aF =
+	[
+		[
+			"3,(v%"+cols+")*"+XS*cw+",((v/"+cols+")|0)*"+YS*ch+','+XS*cw+','+YS*ch+",(a&31)*"+XS*cw+",(a>>5)*"+YS*ch+','+XS*cw+','+YS*ch,
+			"3,SX*128+(v&7)*64,SY*96+(v>>3)*12,64,12,(a&15)*64,(a>>4)*12,64,12",
+			"3,(v&7)*64,SY*96+(v>>3)*12,64,12,(a&15)*64,(a>>4)*12,64,12",
+			"1,256+(v&7)*32,(v>>3)*12,32,12,(a&31)*32,(a>>5)*12,32,12",
+			"3,(v&7)*64,SY*96+(v>>3)*12,64,8,(a&15)*64,(a>>4)*8,64,8",
+			"1,256+(v&7)*32,(v>>3)*12,32,8,(a&31)*32,(a>>5)*8,32,8",
+			"3,(v&7)*64,SY*96+(v>>3)*12,64,4,(a&15)*64,(a>>4)*4,64,4",
+			"1,"+XS*bpb*bpr+"+(v%"+bpr+")*"+XS*bpb+",((v/"+bpr+")|0)*"+YS*MYC+','+XS*bpb+','+YS+",(a&31)*"+XS*bpb+",(a>>5)*"+YS+','+XS*bpb+','+YS,
+			"1,(v&7)*32,(v>>3)*4,32,4,(a&31)*32,(a>>5)*4,32,4"
+		],
+		[
+			"4,(v%"+cols+")*"+XS*cw+",((v/"+cols+")|0)*"+YS*ch+','+XS*cw+','+YS*ch+",(a&31)*"+XS*cw+",(a>>5)*"+YS*ch+','+XS*cw+','+YS*ch,
+			"4,SX*128+(v&7)*64,SY*96+(v>>3)*12,64,12,(a&15)*64,(a>>4)*12,64,12",
+			"4,(v&7)*64,SY*96+(v>>3)*12,64,12,(a&15)*64,(a>>4)*12,64,12",
+			"2,256+(v&7)*32,(v>>3)*12,32,12,(a&31)*32,(a>>5)*12,32,12",
+			"4,(v&7)*64,SY*96+(v>>3)*12,64,8,(a&15)*64,(a>>4)*8,64,8",
+			"2,256+(v&7)*32,(v>>3)*12,32,8,(a&31)*32,(a>>5)*8,32,8",
+			"4,(v&7)*64,SY*96+(v>>3)*12,64,4,(a&15)*64,(a>>4)*4,64,4",
+			"2,"+XS*bpb*bpr+"+(v%"+bpr+")*"+XS*bpb+",((v/"+bpr+")|0)*"+YS*MYC+','+XS*bpb+','+YS+",(a&31)*"+XS*bpb+",(a>>5)*"+YS+','+XS*bpb+','+YS,
+			"2,(v&7)*32,256+(v>>3)*4,32,4,(a&31)*32,(a>>5)*4,32,4"
+		]
+	];
+	fInitGraph(); // alert(aP[0][7])
+
+	for(i=0;i<aPal.length;++i)
+	{
+		fBlock(c1,SX*MXC*i,SY*bpc*(rpc-1),SX*MXC,SY*MYC,i,0);
+		fBlock(c1,SX*MXC*i,SY*bpc*(rpc-1)+SY*MY-1,SX*MXC,SY*MYC,i,1)
+	}
+	fBlock(c1,0,0,XS*bpb*bpr,YS*bpc*(rpc-1),10,s=bScanLn&&YS>1&&!(YS&1));
+	fBlock(c1,XS*bpb*bpr,0,XS*bpb*bpr,YS*bpc*rpc,2,s);
+	fBlock(c2,0,0,XS*bpb*bpr,YS*bpc*(rpc-1),10,s);
+	fBlock(c2,XS*bpb*bpr,0,XS*bpb*bpr,YS*bpc*rpc,12,s);
+	for(i=1;i<256;++i)
+		for(x=i%bpr,y=(i/bpr)|0,j=0;j<bpb;++j)
+		{
+			for(k=0;k<rpc;++k)if(i&(128>>j))
+			{
+				k-2?fPixel(c1,XS*bpb*x+XS*j,YS*bpc*k+YS*y,XS,YS,k+2,s):0;
+				fPixel(c2,XS*bpb*x+XS*j,YS*bpc*k+YS*y,XS,YS,k?k-1?7:6:1,s);
+			}
+			if(k=(i>>((3-j)<<1))&3)
+			{
+				fPixel(c1,XS*bpb*bpr+XS*bpb*x+XS*j*bpp,YS*y*MYC,XS*bpp,YS*MYC,k-3?k+2:1,s);
+				fPixel(c2,XS*bpb*bpr+XS*bpb*x+XS*j*bpp,YS*y*MYC,XS*bpp,YS*MYC,k-3?7-k:11,s);
+			}
+		}
+		fBlock(c3,0,YS*rows*ch,XS*bpb*bpr*MX,YS*bpc*MYC,10,s);
+		fBlock(c3,XS*bpb*bpr*MX,YS*rows*ch,XS*bpb*bpr*MX,YS*bpc*MYC,2,s);
+		fBlock(c4,0,YS*rows*ch,XS*bpb*bpr*MX,YS*bpc*MYC,10,s);
+		fBlock(c4,XS*bpb*bpr*MX,YS*rows*ch,XS*bpb*bpr*MX,YS*bpc*MYC,12,s);
+		for(i=1;i<256;++i)
+			for(x=i%bpr,y=(i/bpr)|0,j=0;j<bpb;++j)
+			{
+				if(i&(128>>j))
+				{
+					fPixel(c3,XS*bpb*MX*x+XS*MX*j,YS*rows*ch+YS*MY*y,XS*MX,YS*MY,2,s);
+					fPixel(c4,XS*bpb*MX*x+j*XS*MX,YS*rows*ch+YS*MY*y,XS*MX,YS*MY,12,s)
+				}
+				if(k=(i>>((3-j)<<1))&3)
+				{
+					fPixel(c3,XS*bpb*bpr*MX+XS*bpb*MX*x+XS*MXC*j,YS*rows*ch+y*YS*MYC,XS*MXC,YS*MY,k-3?k+2:1,s);
+					fPixel(c4,XS*bpb*bpr*MX+XS*bpb*MX*x+XS*MXC*j,YS*rows*ch+y*YS*MYC,XS*MXC,YS*MY,k-3?7-k:11,s)
+				}
+			}
+			for(i=0;i<256;fChar(i++,1))fChar(i);
+
+	return $v = c5;
+}
+
+function fInitGraph(i,j)
+{
+	for(aP=[],i=0;i<2;++i)
+		for(aP[i]=[],j=0;j<9;++j)
+			fMacro("aP["+i+"]["+j+"]=function(a,v){$v.drawImage(e"+aF[i][j]+")}")
+}
+
+function fMacro(s)
+{
+	eval(s)
+}
+
+function fMakeCanvas(w,h,a,p,e,c)
+{
+	if(e=(c=document).createElement("canvas"))
+	{
+		e.width=w;e.height=h;
+		if(a)(p||c.body).appendChild(e);
+		c=e.getContext("2d")
+	}
+	return{e:e,c:e?c:e}
+}
+
+//function fBlock(g,x,y,w,h,c,s){g.globalAlpha=bTrans&&c==10?0:1;if(bTrans&&c==10)s=0;g.fillStyle=c=aPal[c];g.fillRect(x,y,w,h);
+
+function fBlock(g,x,y,w,h,c,s)
+{
+	g.fillStyle=c=aPal[c];
+	g.fillRect(x,y,w,h);
+	if(s)for(g.fillStyle=fR2H((c=fI2R(fH2I(c))).r>>1,c.g>>1,c.b>>1),h+=y;++y<h;g.fillRect(x,y++,w,1));
+}
+
+// function fPixel(g,x,y,w,h,c,s){fBlock(g,x,y,w,h,c,s)} // For now - will use fClone eventually
+
+function fPixel(g,x,y,w,h,c,s)
+{
+	fClone(e1,g,SX*MXC*c,SY*bpc*(rpc-1)+s*((SY*MYC)-1),w,h,x,y,w,h)
+}
+
+function fMakeAtomFont(a,h,i,j,l,s,b)
+{
+	for(a=aChars,b=["00000000","0f0f0f0f","f0f0f0f0","ffffffff"],i=0;i<256;++i)
+	{
+		l=i&63;
+		if((h=i>>6)&&h-2)
+			for(s="",j=6;j;s+=b[l>>(j-=2)&3]);
+			else s="000000"+a[l]+"0000";
+		for(a[i]=[],j=0;j<12;++j)a[i][j]=h-2?parseInt(s.substr(j<<1,2),16):a[l][j]^255
+	}
+}
+
+function fChar(c,s,i,j,k,l,x,y)
+{
+	for(l=c>>6,i=0,j=s||l>2?e2:e1,k=s?c4:c3,x=XS*cw*(c%cols),y=YS*ch*((c/cols)|0),c=aChars[c];i<ch;i++)fByte(j,k,c[i],x,YS*i+y,l)
+}
+
+function fByte(s,d,b,x,y,l)
+{
+	fClone(s,d,XS*bpb*(b%bpr),YS*((b/bpr)|0)+(l-1?0:YS*bpc),XS*bpb,YS,x,y,XS*bpb,YS)
+}
+
+function fClone(s,d,sx,sy,sw,sh,dx,dy,dw,dh)
+{
+	d.drawImage(s,sx,sy,sw,sh,dx,dy,dw,dh)
+}
+
+function fR2H(r,g,b)
+{
+	return '#'+fHxB(r)+fHxB(g)+fHxB(b)
+}
+
+function fI2R(n)
+{
+	return n>=0&&n<=0xffffff?{r:n>>16,g:n>>8&255,b:n&255}:{r:0,g:0,b:0}
+}
+
+function fH2I(h,e,l,n)
+{
+	return(l=h.length)-7&&l-4?e||"":(n=parseInt(h.substr(1),16),l-7?(n&15)*17+(n&240)*272+(n&3840)*4352:n)
+}
+
+function fHxB(n)
+{
+	return((n&=255)<16?'0':"")+n.toString(16)
+}
+
+function fGrSc(r,g,b)
+{
+	return(27*r+53*g+10*b)/90
+}
+
+function fBW(v)
+{
+	return fR2H(v=fGrSc((v=fI2R(fH2I(v))).r,v.g,v.b),v,v)
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+; Switch to CLEAR mode 
+;
+; mode				palette
+;---------------------------------------------
+; m =  0, CLEAR0		p = 0	
+; m =  1, CLEAR1 colour
+; m =  3, CLEAR1
+; m =  5, CLEAR2 colour
+; m =  7, CLEAR2
+; m =  9, CLEAR3 colour
+; m = 11, CLEAR3
+; m = 13, CLEAR4 colour
+; m = 15, CLEAR4
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+function fMode(m,p)
+{
+	if(nMode-m||nPal-p)
+	{
+		nMode=m;
+		nPal=p;
+		fP=bCanvas?aP[p][m=++m>>1]:fSprite;
+		nLen=aLen[m];
+		fReDraw()
+	}
+}
+
+function fReDraw(i)
+{
+	for(i=0;i<nLen;i++)
+		fP(i,MEM[HIMEM+i])
+}
+
+var oRSG;
+
+function fResizeGr()
+{
+	if (oRSG) clearTimeout(oRSG); fInitCanvas(); oRSG = setTimeout(function(){nPal^=1;fMode(0,nPal^1);fBreak()},200);
+}
+
+onEvent(window, "load", fStartUp);
+
+function fLogin()
+{
+	fDemo(aDemos, aDemos.length-1);
+	setTimeout(fBreak, 200);
+}
+
+			// -->
+		</script>
+		<script type = "text/javascript" language = "JavaScript" src = "./atom_roms_all.js"></script>
+		<script type = "text/javascript" language = "JavaScript" src = "./m6502.js"></script>
+		<script type = "text/javascript" language = "JavaScript" src = "./6522_VIA.js"></script>
+	</head>
+	<body class = "cBlock">
+		<div id = "dManual" class = "cBlock"></div>
+		<div id = "dPaste">
+			<div id = "dSource" style = "display: none">
+				<textarea id = "fSource" onclick = "fKeyboard()" cols = "32" rows = "16">
+1000 REM *********************
+1010 REM --/\/\ SNAKE \/\/8<--
+1020 REM *********************
+1030 
+1100 REM SHOW INSTRUCTIONS
+1110 REM *****************
+1120 
+1200 P.$12"     * * * S N A K E * * *"''
+1210 P."     --/\/\/\/\/\/\/\/:<--"''
+1220 P."GUIDE THE SNAKE ONTO THE NUMBERS"'
+1230 P."  BUT DON'T RUN INTO YOURSELF"''
+1240 P."       OR THE BOUNDARY !"''
+1250 P."      LEFT : Z      RIGHT : X"'
+1260 P."        UP : '       DOWN : /"'
+1270 P."   RESTART : SPACE  PAUSE : P"''
+1290 
+1300 REM INITIALISE GAME
+1310 REM ***************
+1320 
+1400 GOS.z; REM MACHINE CODE FOR KEY CONTROLS AND SOUND EFFECTS
+1410 
+1420 B=P+64;A=B+6;!B=#04081020;B!4=#102; REM POINT TEST DATA
+1430 IN." ENTER SPEED (1=SLOW,99=FAST)"$P
+1440 E=VAL$P;IFE<1ORE>99E=99
+1450 H=200;@=5;E=200-2*E;$P="HI-SCORE"
+1490 
+1500 REM NEW GAME LOOP
+1510 REM *************
+1520 
+1530 REM SET UP SNAKE
+1540 REM ************
+1550 
+1600a!A=A+16;A!4=!A;     REM HEAD AND TAIL POINTERS
+1610 A!8=!A;A!12=A+#A3C; REM POINTER LIMITS
+1620 S=10+A.R.%20;T=5+A.R.%33; REM HEAD X, Y POSITION
+1630 W=S;X=T; REM TAIL X, Y POSITIONS
+1640 U=1;V=0;G=0;N=100;M=0
+1690 
+1700 REM DRAW BOARD
+1710 REM **********
+1720 
+1800 P.$12;?#E1=0;CLEAR0; REM CLEAR SCREEN & TURN OFF CURSOR
+1810 MOVE0,0;DRAW63,0;DRAW63,44;DRAW0,44;DRAW0,0;REM DRAW WALLS
+1900 GOS.x;F.J=1TO2;S=S+U;T=T+V;GOS.h;N.;GOS.y
+1990 
+2000 REM MAIN LOOP
+2010 REM *********
+2020 
+2100 REM GET KEYPRESS
+2110 REM ************
+2120 
+2130bLI.LL8; REM GET A KEY AND STORE IN #70
+2140 IF?#70=58U=-1;V= 0;G.c; REM Z / LEFT
+2150 IF?#70=56U= 1;V= 0;G.c; REM X / RIGHT
+2160 IF?#70=31U= 0;V=-1;G.c; REM ? / DOWN
+2170 IF?#70=23U= 0;V= 1;G.c; REM [ / UP
+2180 IF?#70=48K=255;GOS.k;K=48;GOS.k;K=255;GOS.k; REM PAUSE
+2190 
+2200 REM UPDATE SNAKE HEAD 
+2210 REM *****************
+2220 
+2230cS=S+U;T=T+V
+2240 
+2300 REM COLLISION DETECTIONS
+2310 REM ********************
+2320 
+2330 R=#8000+S/2+(47-T)/3*32; REM LOCATION WHERE HEAD WILL BE
+2390 
+2400 REM DID WE HIT A "PILL"?
+2410 REM ********************
+2420 
+2430 IFC=S/2ANDD=T/3G.d; REM YES - NOT DEAD!
+2490 
+2500 REM DID WE HIT OURSELVES OR THE WALL?
+2510 REM *********************************
+2520 
+2530 Q=(?R&(B?(S&1+(47-T)%3*2))<>0); REM POINTS @ NEW HEAD POS
+2540 IFQ=0GOS.h;G.e; REM NO UPDATE SCORE AND JUMP TO DELAY
+2590 
+2600 REM DEAD!
+2610 REM *****
+2620 
+2630 F.I=1TO6
+2640   PLOT 14,S,T; REM WOBBLE SNAKE HEAD
+2650   F.J=1TO10
+2660     ?#B002=?#B002:4; REM MAKE A NOISE
+2670   N.J
+2680 N.I
+2690 G.f
+2699
+2700 REM PILL HIT - UPDATE SCORE AND GROW SNAKE
+2710 REM **************************************
+2720 
+2800 REM UPDATE SCORE AND SET GROWTH
+2810 REM ***************************
+2820 
+2830dG=G+F;M=M+F
+2840 
+2850 F=16;GOS.s; LI.LL4; REM REMOVE OLD PILL & MAKE A NOISE
+2860 GOS.x;GOS.y;N=100; REM SHOW SCORE & MAKE NEW PILL
+2870 GOS.h; REM DRAW HEAD IN NEW POSITION
+2900 
+3000 REM DECREASE PILL POWER
+3010 REM *******************
+3020 
+3030eIFN=F*6F=F-1;GOS.s;LI.LL6; REM DECREASE POWER & BLEEP
+3040 
+3100 REM IF PILL SPENT REMOVE IT, MAKE NEW PILL AND GROW BY 1
+3110 REM ****************************************************
+3120 
+3130 N=N-1;IFN<1F=16;GOS.s;GOS.y;M=M+1;N=100
+3140 
+3200 REM IF WE'RE NOT GROWING WE'RE MOVING OUR TAIL!
+3210 REM *******************************************
+3220 
+3230 IFM=0GOS.t;G.g
+3240 
+3300 REM IF WE ARE GROWING MARK IT
+3310 REM *************************
+3320 
+3330 M=M-1
+3340 
+3350 REM AND SPEED UP
+3360 REM ************
+3370 
+3380 E=E-1;IFE<1E=1
+3390 
+3400 REM DELAY
+3410 REM *****
+3420 
+3430gF.I=1TOE;N.;G.b
+3490 
+3500 REM UPDATE HIGH SCORE IF NECESSARY AND WAIT FOR A KEY
+3510 REM *************************************************
+3520 
+3600fIFG>H H=G; REM IF HIGH SCORE BEATEN SAVE NEW ONE
+3610 K=0;GOS.k;G.a; REM WAIT FOR SPACE - START NEW GAME
+3690 
+3700 REM WAIT FOR KEY CODE IN K
+3710 REM **********************
+3720 
+3730kDOLI.LL8;U.?#70=K;R.
+3900 
+4000 REM DRAW HEAD AND STORE POSITION
+4010 REM ****************************
+4020 
+4100hPLOT13,S,T;?!A=16*(U+1)+V+1;!A=1+!A;IF!A=A!12;!A=A!8
+4200 R.
+4900 
+5000 REM RETRIEVE POSTION AND DRAW TAIL
+5010 REM ******************************
+5020 
+5100tL=?(A!4);Y=L/16-1;Z=L%16-1;W=W+Y;X=X+Z;PLOT15,W,X
+5200 A!4=1+A!4;IFA!4=A!12;A!4=A!8; REM UPDATE TAIL POINTER
+5300 R.
+5900 
+6000 REM GENERATE NEW RANDOM PILL AT RANDOM LOCATION
+6010 REM *******************************************
+6020 
+6030yC=A.R.%60+2;D=A.R.%39+3; REM PICK LOCATION WITHIN WALLS
+6100 C=C/2;D=D/3; REM ADJUST POSITION AND SHOW PILL
+6200 IF?(#8000+C+(15-D)*32)<>64G.y; REM IF NOT EMPTY PICK NEW ONE
+6300 F=A.R.%9+1;  REM PICK RANDOM PILL STRENGTH
+6900 
+7000 REM SHOW PILL AT (C, D)
+7010 REM *******************
+7020 
+7030s?(#8000+C+(15-D)*32)=F+48;R.
+7900 
+8000 REM UPDATE SCORE AND HIGH SCORE
+8010 REM ***************************
+8020 
+8030xP.$30"  SCORE :"G" "$P" :"H;R.
+8900 
+9000 REM KEY CONTROLS AND SOUND EFFECTS
+9010 REM ******************************
+9020 
+9030zDIM LL9, P-1; REM MAKE SPACE FOR LABELS AND MACHINE CODE
+9040 P. $21; REM DISABLE SCREEN TO HIDE MACHINE CODE ASSEMBLY
+9050[
+9100 :LL1 LDA #B002; LDY @#0A \ TEN SPEAKER CYCLES WITH DELAY
+9200 :LL2 LDX #80             \ ... OF X = NUMBER IN #80
+9300 :LL3 DEX; BNE LL3        \ DELAY OF X SET ABOVE
+9310      EOR @#04; STA #B002; DEY; BNE LL2; RTS
+9400 :LL4 LDY @#19; STY #81   \ 25x10 CYCLE RANDOM NOISES
+9500 :LL5 LDY #81; LDA #FF00,Y; STA #80 \ RANDOM NOISE (ROM)
+9550      JSR LL1; DEC #81; BPL LL5; RTS
+9600 :LL6 LDA @#20; STA #80; LDY @#0F; STY #81
+9700 :LL7 JSR LL1; DEC #81; BNE LL7; RTS
+9800 :LL8 JSR #FE71; STY #70; RTS \ READ KEY STORE IN #70
+9900]
+9910 P. $6; REM ENABLE SCREEN
+9920 R.
+9930 
+9999 (C) ACORNSOFT 1981,PM 2012
+					</textarea>
+
+<textarea id = "fDebug" cols = "32" rows = "16">
+Debug
+</textarea>
+					<br />
+					<button onclick = "fAction('LOAD')">LOAD</button>
+					<button onclick = "fAction('DEMO')">DEMO</button>
+				</div>
+				<button onclick = "fToggle()">CODE</button>
+			</div>
+		</div>
+		<center>
+			<div id = "dTxtScreen"></div>
+		</center>
+	</body>
+</html>
