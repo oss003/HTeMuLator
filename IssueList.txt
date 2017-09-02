@@ -1,4 +1,4 @@
-Item	Solved  Description
+Item Solved Description
 --------------------------------------------------------------
 1.      N     CPU - BCD
 2.      N     CPU - IDX
