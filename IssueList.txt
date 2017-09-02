@@ -1,12 +1,12 @@
 Item	Solved  Description
 --------------------------------------------------------------
-1.      N   	CPU - BCD
-2.      N   	CPU - IDX
-3.      N   	VIA - Timers
-4.      N   	Sprites - on resize - all sizes except full screen  
-5.      N   	IRQ T1 - Manic Miner introscreen
-6.      N   	Keys - Joe Blade - hangs
-7.      N   	Palette issues
+1.      N     CPU - BCD
+2.      N     CPU - IDX
+3.      N     VIA - Timers
+4.      N     Sprites - on resize - all sizes except full screen  
+5.      N     IRQ T1 - Manic Miner introscreen
+6.      N     Keys - Joe Blade - hangs
+7.      N     Palette issues
 8.      N     Sound
 9.      N     Switchable utility roms at #BFFF
 10.     N     BRAN - Automatic rom switch software
