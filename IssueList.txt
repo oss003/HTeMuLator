@@ -1,9 +1,0 @@
-Item	Description
---------------------------------------------------------------
-1.	CPU - BCD
-2.	CPU - IDX
-3.	VIA - Timers
-4.	Sprites - on resize - all sizes except full screen
-5.	IRQ T1 - Manic Miner introscreen
-6.	Keys - Joe Blade - hangs
-7.	Palette issues

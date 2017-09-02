@@ -13,7 +13,7 @@
 ; VARG_type()	, added prog and disk property
 ; fLogin()	, added loading B400MMC.js
 ; 		  added loading Disk001.js
-; 		  added fDebug textarea
+; 		  added dDebug textarea
 ;
 ;==============================================================
 
@@ -28,6 +28,11 @@ var
     LATCH_REG 		= 0x01,
     READ_DATA_REG	= 0x02,
     WRITE_DATA_REG	= 0x03,
+
+// DIR_CMD_REG commands
+    CMD_DIR_OPEN	= 0x00,
+    CMD_DIR_READ	= 0x01,
+    CMD_DIR_CWD		= 0x02,
 
 // CMD_REG_COMMANDS
     CMD_FILE_OPEN_IMG	= 0x12,
@@ -67,17 +72,23 @@ var
 
     dFilename = "",			// Filename loaded diskfile
     dDisk,				// Array with diskimage loaded diskfile
-
-    debug = 0,				// Output to debug window on/off
+    filenum,				// Filenumber for RAF
+    debug = ARGV.debug * 1,		// Output to debug window on/off
 
 // AtoMMC vars
     LATD = 255,				// Data latch
     globalData = [],			// Data array 
     globalIndex = 0,			// Data array pointer
     byteValueLatch,			// Latch bytevalue
-    globalLBAOffset = 0;		// Disk image array pointer
+    globalLBAOffset = 0,		// Disk image array pointer
 
-// Drive info
+// Drive vars
+    aDisks=[],				// Array with disk images
+    lastDriveNo = -1,
+    globalCurDrive = 0,			// Current selected Drive
+    sFilter = "",              	        // Filterstring
+    DirPointer = 0;			// Directory counter
+
     function Struct(val1,name, val2)	// Structure for driveinfo table
     {
       this.basesector = val1;
@@ -92,8 +103,6 @@ var
     driveInfo[2] = new Struct(0,"",255);
     driveInfo[3] = new Struct(0,"",255);
 
-    lastDriveNo = -1;
-    globalCurDrive = 0;
 
 /*
 ;==============================================================
@@ -113,20 +122,34 @@ var
 
 function fMMCRead(nAddr)
 {
-    var Ret = 0;
+    var Ret = 0,test;
+
     switch (A=nAddr&7){
+
         case CMD_REG:
             Ret = LATD;
             break;
+
         case READ_DATA_REG:
-            WriteDataPort((globalData[globalIndex]));
+            // read data port.
+            //
+            // any data read requests must be primed by writing CMD_INIT_READ (0x3f) here
+            // before the 1st read.
+            //
+            // this has to be done this way as the PIC hardware only latches the address 
+            // on a WRITE.
+            WriteDataPort(globalData[globalIndex]);
             ++globalIndex;
             Ret = LATD;
             break;
+
         default:
             WriteDataPort(STATUS_OK);
+
     }
-    tDebug("Read " + nAddr.toString(16) + "->"+ ((typeof Ret=="undefined") ? "-" : Ret.toString(16))  + ","+ globalIndex)
+
+    tDebug("r" + fHexWord(nAddr) + "<-" + ((typeof Ret=="undefined") ? "-" : HEX(Ret))+":"+
+           "a" + HEX(ACC) + "x" + HEX(XIR) + "y" + HEX(YIR) + "pc" + fHexWord(PCR));
     return (typeof Ret=="string") ? Ret.charCodeAt(0) : Ret;
 }
 
@@ -149,9 +172,84 @@ function fMMCWrite(nAddr,nVal)
     var Ret = 0;
     switch (A=nAddr&7){
         case CMD_REG:{
-            LatchedData = nVal;
+            received = nVal;
+	    // File Group 0x10-0x17, 0x30-0x37, 0x50-0x57, 0x70-0x77
+	    // filenum = bits 6,5
+	    // mask1 = 10011000 (test for file group command)
+	    // mask2 = 10011111 (remove file number)
+	    if ((received & 0x98) == 0x10) {
+	      filenum = (received >> 5) & 3;
+	      received &= 0x9F;
+	    }
+	    
+	    // Data Group 0x20-0x23, 0x24-0x27, 0x28-0x2B, 0x2C-0x2F
+	    // filenum = bits 3,2
+	    // mask1 = 11110000 (test for data group command)
+	    // mask2 = 11110011 (remove file number)
+	    if ((received & 0xf0) == 0x20) {
+	      filenum = (received >> 2) & 3;
+	      received &= 0xF3;
+	    }
             WriteDataPort(STATUS_BUSY);
-            switch (nVal){
+
+            switch (received){
+
+            // Directory group, moved here 2011-05-29 PHS.
+
+                case CMD_DIR_OPEN:
+                    // reset the directory reader
+                    //
+                    // when 0x3f is read back from this register it is appropriate to
+                    // start sending cmd 1s to get items.
+                    //
+                    sFilter="";
+                    for (i = 0; i < globalData.length -1; ++i){
+                      sFilter = sFilter + String.fromCharCode(globalData[i]);
+                    }
+                    DirPointer = 0;
+                    globalData = [];
+                    WriteDataPort(STATUS_OK);
+                    break;
+
+                case CMD_DIR_READ:
+                    if (aDisks.length !== 0){
+                       if (DirPointer !== aDisks.length){
+                         // get next directory entry
+                         //
+                         for (i = 0; i < aDisks[DirPointer][0].n.length; ++i){
+                           globalData[i+1]=aDisks[DirPointer][0].n[i];
+                         }
+                         globalData[i+1]=0;
+                         ++DirPointer;
+                         WriteDataPort(STATUS_OK);
+                         break;
+                       } else {
+                         // done
+                         //
+                         WriteDataPort(STATUS_COMPLETE);
+                         break;
+                       }
+                    }
+
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+                case CMD_DIR_CWD:
+                    // set CWD
+                    //
+                    worker = WFN_SetCWDirectory;
+
+           // File group.
+
+                case CMD_FILE_CLOSE:
+                    // close the open file, flushing any unwritten data
+                    //
+                    worker = WFN_FileClose;
+
+                case CMD_FILE_OPEN_READ:
+                    // open the file with name in global data buffer
+                    //
+                   worker = WFN_FileOpenRead;
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
                 case CMD_FILE_OPEN_IMG:
                     // open the file as backing image for virtual floppy drive
@@ -159,6 +257,7 @@ function fMMCWrite(nAddr,nVal)
                     var    i = globalData[0],
                         m = 1,
                         n = 0,
+                        Ret=0x44,
                         newDiskName = "";
 
                     while(globalData[m] && m < 12){
@@ -166,19 +265,54 @@ function fMMCWrite(nAddr,nVal)
                         ++m;
                         ++n;
                     }
-                    driveInfo[i].filename = newDiskName;
-                    driveInfo[i].attribs=0;
-                    ++n;
 
-                    WriteDataPort(STATUS_OK);
+                    for (i = 0; i < aDisks.length; ++i){
+                      if (aDisks[i][0].n == newDiskName){
+                        driveInfo[globalData[0]].filename = newDiskName;
+                        driveInfo[globalData[0]].attribs=0;
+                        driveInfo[globalData[0]].image=aDisks[i][0].d;
+                        Ret=STATUS_OK;
+                        break;
+                      }
+                    }
+                    WriteDataPort(Ret);
                     break;
+ 
+
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+                case CMD_FILE_OPEN_WRITE:
+                    // open the file with name in global data buffer for write
+                    //
+                    worker = WFN_FileOpenWrite;
+
+                case CMD_FILE_OPEN_RAF:
+                    // open the file with name in global data buffer for write/append
+                    //
+                    worker = WFN_FileOpenRAF;
+
+                case CMD_FILE_DELETE:
+                    // delete the file with name in global data buffer
+                    //
+                    worker = WFN_FileDelete;
+
+                case CMD_FILE_GETINFO:
+                    // return file's status byte
+                    //
+                    worker = WFN_FileGetInfo;
+
+                case CMD_FILE_SEEK:
+                    // seek to a location within the file
+                    //
+                    worker = WFN_FileSeek;
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
                 case CMD_INIT_READ:
                     // All data read requests must send CMD_INIT_READ before begining reading
                     // data from READ_DATA_PORT. After execution of this command the first byte 
                     // of data may be read from the READ_DATA_PORT.
                     WriteDataPort(globalData[0]);
-                    globalIndex = 0;
+                    globalIndex = 1;
                     break;
 
                 case CMD_INIT_WRITE:
@@ -186,7 +320,30 @@ function fMMCWrite(nAddr,nVal)
                     // WRITE_DATA_REG    
                     // globalDataPresent is a flag to indicate whether data is present in the bfr.
                     globalIndex = 0;
+                    globalData = [];
                     break;
+
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+                case CMD_READ_BYTES:
+                    // Replaces READ_BYTES_REG
+                    // Must be previously written to latch reg.
+                    globalAmount = byteValueLatch;
+                    worker = WFN_FileRead;
+
+                case CMD_WRITE_BYTES:
+                    // replaces WRITE_BYTES_REG
+                    // Must be previously written to latch reg.
+                    globalAmount = byteValueLatch;	
+                    worker = WFN_FileWrite;
+
+                case CMD_EXEC_PACKET:
+                    // Exec a packet in the data buffer.
+                    worker = WFN_ExecuteArbitrary;
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+         // SDDOS/LBA operations
 
                 case CMD_LOAD_PARAM:
                     // load sddos parameters for read/write
@@ -225,15 +382,15 @@ function fMMCWrite(nAddr,nVal)
                     // read image sector
                     var returnCode = STATUS_COMPLETE | ERROR_INVALID_DRIVE;
 
+                    globalData = [];
                     if (driveInfo[globalCurDrive].attribs != 0xff){
                        for (i = 0; i < 257; ++i){
-                            globalData[i]=driveInfo[globalCurDrive].image[globalLBAOffset + i ];
+                            globalData[i+1]=driveInfo[globalCurDrive].image[globalLBAOffset + i];
                         }
                         WriteDataPort(STATUS_OK);
-                        return STATUS_OK;
+                        return;
                     }
-                    driveInfo[globalCurDrive].attribs = 0xff;
-                    returnCode |= STATUS_COMPLETE;
+                    WriteDataPort(returnCode);
                     break;
 
                 case CMD_WRITE_IMG_SEC:
@@ -265,19 +422,82 @@ function fMMCWrite(nAddr,nVal)
                     // read the imgInfo structures back out of eeprom,
                     // or 'BOOTDRV.CFG' if present (gets precidence)
                     // try to read the boot config file
-                    driveInfo[0].filename=dFilename;
-                    driveInfo[0].attribs=0
-                    driveInfo[0].image=dDisk.concat([]);
-                    driveInfo[2].filename="DISK3";
-                    driveInfo[2].attribs=0
-                    driveInfo[2].image=dDisk.concat([]);
-                    WriteDataPort(STATUS_OK);
+                    var Ret=STATUS_OK,d,arg=[];
+
+                    arg[0]=ARGV.disk0.toUpperCase();
+                    arg[1]=ARGV.disk1.toUpperCase();
+                    arg[2]=ARGV.disk2.toUpperCase();
+                    arg[3]=ARGV.disk3.toUpperCase();
+
+                    for (d = 0; d < 4; ++d){
+
+                      if (arg[d].length > 0){ 
+                        newDiskName=arg[d];
+                        globalData[0]=d;
+
+                        for (i = 0; i < aDisks.length; ++i){
+                          if (aDisks[i][0].n == newDiskName){
+                            driveInfo[globalData[0]].filename = newDiskName;
+                            driveInfo[globalData[0]].attribs=0;
+                            driveInfo[globalData[0]].image=aDisks[i][0].d;
+                          }
+                          if (i==aDisks.length){Ret=0x44}
+                        } 
+                      }
+
+                    }
+                    WriteDataPort(Ret);
                     break;
 
                 case CMD_IMG_UNMOUNT:
                     driveInfo[byteValueLatch].attribs=255;
                     WriteDataPort(STATUS_OK);
                     break;
+
+         // Utility commands.
+
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+                case CMD_GET_PORT_DDR;
+                   // get portb direction register
+                   WriteDataPort(TRISB);
+
+                case CMD_SET_PORT_DDR;
+                   // set portb direction register
+                   TRISB = byteValueLatch;
+                   WriteEEPROM(EE_PORTBTRIS, byteValueLatch);
+                   WriteDataPort(STATUS_OK);
+
+                case CMD_READ_PORT;
+                   // read portb
+                   WriteDataPort(PORTB);
+
+                case CMD_WRITE_PORT;
+                   // write port B value
+                   LATB = byteValueLatch;
+                   WriteEEPROM(EE_PORTBVALU, byteValueLatch);
+                   WriteDataPort(STATUS_OK);
+
+
+                case CMD_SET_CFG_BYTE) // write config byte
+                   configByte = byteValueLatch;
+                   WriteEEPROM(EE_SYSFLAGS, configByte);
+                   WriteDataPort(STATUS_OK);
+
+                case CMD_READ_AUX) // read porta - latch & aux pin on dongle
+                   WriteDataPort(LatchedAddress);
+
+                case CMD_GET_HEARTBEAT)
+                   // get heartbeat - this may be important as we try and fire
+                   // an irq very early to get the OS hooked before its first
+                   // osrdch call. the psp may not be enabled by that point,
+                   // so we have to wait till it is.
+                   //
+                   WriteDataPort(heartbeat);
+                   heartbeat ^= 0xff;
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
 
                 case CMD_GET_CARD_TYPE:
                     byteValueLatch = nVal;
@@ -300,18 +520,18 @@ function fMMCWrite(nAddr,nVal)
             break;
         }
 
-        case READ_DATA_REG: {
-            // read data port.
-            //
-            // any data read requests must be primed by writing CMD_INIT_READ (0x3f) here
-            // before the 1st read.
-            //
-            // this has to be done this way as the PIC hardware only latches the address 
-            // on a WRITE.
-            WriteDataPort((globalData[globalIndex]));
-            ++globalIndex;
-            break;
-        }
+//        case READ_DATA_REG: {
+//            // read data port.
+//            //
+//            // any data read requests must be primed by writing CMD_INIT_READ (0x3f) here
+//            // before the 1st read.
+//            //
+//            // this has to be done this way as the PIC hardware only latches the address 
+//            // on a WRITE.
+//            WriteDataPort((globalData[globalIndex]));
+//            ++globalIndex;
+//            break;
+//       }
 
         case WRITE_DATA_REG:{
             // write data port.
@@ -323,13 +543,14 @@ function fMMCWrite(nAddr,nVal)
         }
 
         case LATCH_REG:{
-            // latch the written value
+           // latch the written value
             byteValueLatch = nVal;
             WriteDataPort(byteValueLatch);
             break;
         }
     }
-    tDebug("Write "+nAddr.toString(16)+","+ nVal.toString(16));
+    tDebug("w" + fHexWord(nAddr)+"->"+ HEX(nVal)+":"+
+           "a" + HEX(ACC) + "x" + HEX(XIR) + "y" + HEX(YIR) + "pc" + fHexWord(PCR));
 }
 
 /*
@@ -359,14 +580,18 @@ function WriteDataPort(nVal){
 function tDebug(sLine)
 {
     if (debug){
-        document.getElementById('fDebug').value = document.getElementById('fDebug').value + sLine + "\r"
-        document.getElementById("fDebug").scrollTop = document.getElementById("fDebug").scrollHeight
+        document.getElementById('dDebug').value = document.getElementById('dDebug').value + sLine + "\r"
+        document.getElementById("dDebug").scrollTop = document.getElementById("dDebug").scrollHeight
     }
 }
 
 function tMessage(sLine)
 {
-        document.getElementById('fDebug').value = document.getElementById('fDebug').value + sLine + "\r"
-        document.getElementById("fDebug").scrollTop = document.getElementById("fDebug").scrollHeight
+        document.getElementById('dDebug').value = document.getElementById('dDebug').value + sLine + "\r"
+        document.getElementById("dDebug").scrollTop = document.getElementById("dDebug").scrollHeight
+}
+
+function matchRuleShort(str, rule) {
+  return new RegExp("^" + rule.split("*").join(".*") + "$").test(str);
 }
 

@@ -952,12 +952,13 @@ function LDBA(a,A)
 	if((A=a>>12)<10)return MEM[a]				// 0x0000-0x9FFF
 	switch(A)
 	{
-		case 10:return sSDROM_ROM.charCodeAt(a-40960)	// 0xA000-0xAFFF
+		case 10:return sAXR1_ROM.charCodeAt(a-40960)	// 0xA000-0xAFFF
 		case 11:return fIOR(a)&0xff			// 0xB000-0xBFFF
-		case 12:return sABASIC_IC20.charCodeAt(a-49152)	// 0xC000-0xCFFF
+		case 12:return sFxxxPatch_ROM.charCodeAt(a-49152)	// 0xC000-0xCFFF
 		case 13:return sAFloat_IC21.charCodeAt(a-53248)	// 0xD000-0xDFFF
-		case 14:return sDOSROM_U15.charCodeAt(a-57344)	// 0xE000-0xEFFF
-		case 15:return sABASIC_IC20.charCodeAt(a-57344)	// 0xF000-0xFFFF
+//		case 14:return sDOSROM_U15.charCodeAt(a-57344)	// 0xE000-0xEFFF
+		case 14:return sSDROMe_ROM.charCodeAt(a-57344)	// 0xE000-0xEFFF
+		case 15:return sFxxxPatch_ROM.charCodeAt(a-57344)	// 0xF000-0xFFFF
 	}
 }
 
@@ -1207,6 +1208,17 @@ function fTapeRead(sName, sTape)
 	return aCat;
 }
 
+function fDiskRead(sName, sDisk)
+{
+	var
+		i = 0,
+		aCat = [i];
+
+	sName = sName || "";
+	aCat [i = 0] = {n: sName, d: sDisk.substr(i,sDisk.length)};
+	return aCat;
+}
+
 function fHelpWin(nErr, nLn)
 {
 	if (oTimer) clearTimeout(oTimer);
@@ -1275,6 +1287,11 @@ function VARG_type()	// VARG (Variable ARGument) defaults
 	this.user = "";
 	this.pass = "";
 	this.prog = "kees";
+	this.debug = "";
+	this.disk0 = "";
+	this.disk1 = "";
+	this.disk2 = "";
+	this.disk3 = "";
 }
 
 function VARG_get(o)
@@ -1364,8 +1381,13 @@ function fInitCanvas()
 	e4=(c=fMakeCanvas(SX*cw*cols,SY*ch*rows*2,0)).e,c4=c.c;
 	e5=(c=fMakeCanvas(x,y,1)).e,c5=c.c;
 
+	c2.fillStyle="#0f0f0f";c2.fillRect(0,0,512,384);c2.fillStyle="#1f1f1f";for(s=0;s<384;++s)c2.fillRect(0,s++,512,1);
+
+//	s=e4.style;s.position="absolute";s.left=(((WW/2)|0)-((x/2)|0))+"px";s.top="0px";
+
 	s=e5.style;s.position="absolute";
-	s.left=(((WW/2)|0)-((x/2)|0))+"px";s.top=(((WH/2)|0)-((y/2)|0))+"px";// s.border="1px solid red";
+	s.left=(((WW/2)|0)-((x/2)|0))+"px";s.top=(((WH/2)|0)-((y/2)|0))+"px";
+//	s.border="1px solid red"; s.display="none";
 
 	aF =
 	[
@@ -1389,6 +1411,7 @@ function fInitCanvas()
 			"2,256+(v&7)*32,(v>>3)*12,32,8,(a&31)*32,(a>>5)*8,32,8",
 			"4,(v&7)*64,SY*96+(v>>3)*12,64,4,(a&15)*64,(a>>4)*4,64,4",
 			"2,"+XS*bpb*bpr+"+(v%"+bpr+")*"+XS*bpb+",((v/"+bpr+")|0)*"+YS*MYC+','+XS*bpb+','+YS+",(a&31)*"+XS*bpb+",(a>>5)*"+YS+','+XS*bpb+','+YS,
+//			"2,(v&7)*32,256+(v>>3)*4,32,4,(a&31)*32,(a>>5)*4,32,4"
 			"2,(v&7)*32,256+(v>>3)*4,32,4,(a&31)*32,(a>>5)*4,32,4"
 		]
 	];
@@ -1576,7 +1599,8 @@ var oRSG;
 
 function fResizeGr()
 {
-	if (oRSG) clearTimeout(oRSG); fInitCanvas(); oRSG = setTimeout(function(){nPal^=1;fMode(0,nPal^1);fBreak()},200);
+//	if (oRSG) clearTimeout(oRSG); fInitCanvas(); oRSG = setTimeout(function(){nPal^=1;fMode(0,nPal^1);fBreak()},200);
+	if (oRSG) clearTimeout(oRSG); fInitCanvas(); oRSG = setTimeout(function(){nPal^=1;fMode(0,nPal^1)},200);
 }
 
 onEvent(window, "load", fStartUp);
@@ -1593,7 +1617,7 @@ function fLogin()
 		<script type = "text/javascript" language = "JavaScript" src = "./m6502.js"></script>
 		<script type = "text/javascript" language = "JavaScript" src = "./6522_VIA.js"></script>
 		<script type = "text/javascript" language = "JavaScript" src = "./B400_MMC.js"></script>
-		<script type = "text/javascript" language = "JavaScript" src = "./Disk001.js"></script>
+		<script type = "text/javascript" language = "JavaScript" src = "./archive.js"></script>
 	</head>
 	<body class = "cBlock">
 		<div id = "dManual" class = "cBlock"></div>
