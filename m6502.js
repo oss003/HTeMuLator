@@ -118,8 +118,8 @@ IMM	= function(){return PCR++}																			// IMMediate Address		3	2
 ZPG	= IMB;																								// Zero PaGe				4	2
 ZPX	= function(){return(XIR+LDB(PCR++))&BYT}															// Zero Page,X				5	2
 ZPY	= function(){return(YIR+LDB(PCR++))&BYT}															// Zero Page,Y				6	2
-//XID=function(){return IMW((LDB(PCR++)+XIR)&BYT)}														// (InDirect,X)				7	2
-XID	= function(){return IMW(LDB(PCR++)+XIR)}															// (InDirect,X)				7	2
+//XID	= function(){return IMW(LDB(PCR++)+XIR)}														// (InDirect,X)				7	2
+XID=function(){return IMW((LDB(PCR++)+XIR)&BYT)}														// (InDirect,X)				7	2
 IDY	= function(){return BIR=((AIR=IMW(LDB(PCR++)))+YIR)&WRD,(EXC&&AIR&MSB!=BIR&MSB?++CLK:NUL),BIR}		// (InDirect),Y				8	2
 BRA	= function(){return AIR=IMB(),AIR=PCR-(AIR&FLN?STK-AIR:-AIR),(CLK+=PCR&MSB!=AIR&MSB?FLZ:FLC),AIR}	// relative BRAnch address	9	2
 																										// INDirect					A	3
@@ -274,7 +274,7 @@ INS =	// INStructions		-> I
 /* 25 AND Zero Page		2 3		% ~ 1 ~ ~ ~ % ~ */	function(){AND(ZPG)},
 /* 26 ROL Zero Page		2 5		% ~ 1 ~ ~ ~ % % */	function(){ROL(ZPG)},
 /* 27 *** INVALID		1 2		~ ~ 1 ~ ~ ~ ~ ~ */	N0P,
-/* 28 PLP Implied		1 4		% % 1 ~ % % % % */	function(){FLG=PLB()|FLR|FLB},
+/* 28 PLP Implied		1 4		% % 1 ~ % % % % */	function(){FLG=PLB()|FLR|FLB;FLG&FLD?(ADD=DAD,SUB=DSB):(ADD=BAD,SUB=BSB)},				// function(){FLG=PLB()|FLR|FLB},
 /* 29 AND Immediate		2 2		% ~ 1 ~ ~ ~ % ~ */	function(){FNZ(ACC&=IMB())},
 /* 2A ROL Accumulator	1 2		% ~ 1 ~ ~ ~ % % */	function(){ACC=RLL(ACC)},
 /* 2B *** INVALID		1 2		~ ~ 1 ~ ~ ~ ~ ~ */	N0P,
@@ -298,7 +298,7 @@ INS =	// INStructions		-> I
 /* 3D AND Absolute,X	3 4 *	% ~ 1 ~ ~ ~ % ~ */	function(){AND(ABX)},
 /* 3E ROL Absolute,X	3 7		% ~ 1 ~ ~ ~ % % */	function(){ROL(ABX)},
 /* 3F *** INVALID		1 2		~ ~ 1 ~ ~ ~ ~ ~ */	N0P,
-/* 40 RTI Implied		1 6		% % 1 ~ % % % % */	function(){FLG=PLB();PCR=PLW()},
+/* 40 RTI Implied		1 6		% % 1 ~ % % % % */	function(){FLG=PLB()|FLR|FLB;FLG&FLD?(ADD=DAD,SUB=DSB):(ADD=BAD,SUB=BSB);PCR=PLW()},	// function(){FLG=PLB();PCR=PLW()},
 /* 41 EOR (Indirect,X)	2 6		% ~ 1 ~ ~ ~ % ~ */	function(){EOR(XID)},
 /* 42 *** INVALID		1 2		~ ~ 1 ~ ~ ~ ~ ~ */	N0P,
 /* 43 *** INVALID		1 2		~ ~ 1 ~ ~ ~ ~ ~ */	N0P,
@@ -566,3 +566,68 @@ INIT	= function(){BLD();RST()}
 // The fLog function can be deleted for compacting if logging is disabled (LOG = false)
 
 fLog	= function(s){if(LOG)alert(s)}
+
+/*
+TODO:
+
+void ADC(temp)
+{
+	if (!p.d) {
+		tempw = a + temp + (p.c ? 1 : 0);
+		p.v = !((a ^ temp) & 0x80) && ((a ^ tempw) & 0x80);
+		a = tempw & 0xFF;
+		p.c = tempw & 0x0100;
+		setzn(a); }
+	else {
+		ah = 0;
+		p.z = p.n = 0;
+		tempb = a + temp + (p.c ? 1 : 0);
+		if (!tempb) p.z = 1;
+		al = (a & 0x0F) + (temp & 0x0F) + (p.c ? 1 : 0);
+		if (al > 9) {
+			al -= 10;
+			al &= 0x0F;
+			ah = 1; }
+		ah += (a >> 4) + (temp >> 4);
+		if (ah & 0x08) p.n = 1;
+		p.v = (((ah << 4) ^ a) & 0x80) && !((a ^ temp) & 0x80);
+		p.c = 0;
+		if (ah > 9) {
+			p.c = 1;
+			ah -= 10;
+			ah &= 0x0F; }
+		a = (al & 0x0F) | (ah << 4); }
+}
+
+void SBC(temp)
+{
+	if (!p.d) {
+		tempw = a - (temp + (p.c ? 0 : 1));
+		tempv = (int16_t)a - (int16_t)(temp + (p.c ? 0 : 1));
+		p.v = ((a ^ temp) & 0x80) && ((a ^ tempw) & 0x80);
+		p.c = tempv >= 0;
+		a = tempw & 0xFF;
+		setzn(a); }
+	else {
+		hc = 0;
+		p.z = p.n = 0;
+		tempb = a - temp - (p.c ? 0 : 1);
+		if (!(tempb)) p.z = 1;
+		al = (a & 0x0F) - (temp & 0x0F) - (p.c ? 0 : 1);
+		if (al & 0x10) {
+			al -= 6;
+			al &= 0x0F;
+			hc = 1; }
+		ah = (a >> 4) - (temp >> 4);
+		if (hc) ah--;
+		if ((a - (temp + ((p.c) ? 0 : 1))) & 0x80) p.n = 1;
+		p.v = ((a ^ temp) & 0x80) && ((a ^ tempb) & 0x80);
+		p.c = 1;
+		if (ah & 0x10) {
+			p.c = 0;
+			ah -= 6;
+			ah &= 0x0F; }
+		a = (al & 0x0F) | ((ah & 0x0F) << 4); }
+}
+
+*/

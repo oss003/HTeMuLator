@@ -1,107 +1,109 @@
 /*
+;
 ;==============================================================
 ; B400_MMC.js, AtoMMC emulation at #B400/1/2/3          KC 2017
 ;--------------------------------------------------------------
 ;
 ; Changed functions in HTeMuLator.html:
 ;
-; fIOR(a,A)	, expanded with fMMCRead(a)
-; fIOW(a,v)	, expanded with fMMCWrite(a,v)
-; STBA(a,v,A)	, expanded to 32kB RAM and 8kB video RAM
-; LDBA(a,A)	, expanded to 32kB RAM and 8kB video RAM
-;		  changed AXR1_ROM with SDROM_ROM
-; VARG_type()	, added prog and disk property
-; fLogin()	, added loading B400MMC.js
-; 		  added loading Disk001.js
-; 		  added dDebug textarea
+; fIOR(a),		expanded with fMMCRead(a)
+; fIOW(a,v),	expanded with fMMCWrite(a,v)
+; STBA(a,v),	expanded to 32kB RAM and 8kB video RAM
+; LDBA(a),		expanded to 32kB RAM and 8kB video RAM
+;				changed AXR1_ROM with SDROM_ROM
+; VARG_type(),	added prog and disk property
+; fLogin(),		added loading B400MMC.js
+;				added loading Disk001.js
+;				added fDebug textarea
 ;
 ;==============================================================
-
+;
 ;==============================================================
 ; DEFINITION OF VARIABLES
 ;==============================================================
+;
 */
 
 var
 // PIC registers
-    CMD_REG		= 0x00,
-    LATCH_REG 		= 0x01,
-    READ_DATA_REG	= 0x02,
-    WRITE_DATA_REG	= 0x03,
+	CMD_REG				= 0x00,
+	LATCH_REG 			= 0x01,
+	READ_DATA_REG		= 0x02,
+	WRITE_DATA_REG		= 0x03,
 
 // DIR_CMD_REG commands
-    CMD_DIR_OPEN	= 0x00,
-    CMD_DIR_READ	= 0x01,
-    CMD_DIR_CWD		= 0x02,
+	CMD_DIR_OPEN		= 0x00,
+	CMD_DIR_READ		= 0x01,
+	CMD_DIR_CWD			= 0x02,
 
 // CMD_REG_COMMANDS
-    CMD_FILE_OPEN_IMG	= 0x12,
-    CMD_INIT_READ	= 0x20,
-    CMD_INIT_WRITE	= 0x21,
+	CMD_FILE_OPEN_IMG	= 0x12,
+	CMD_INIT_READ		= 0x20,
+	CMD_INIT_WRITE		= 0x21,
 
 // SDOS_LBA_REG commands
-    CMD_LOAD_PARAM	= 0x40,
-    CMD_GET_IMG_STATUS	= 0x41,
-    CMD_GET_IMG_NAME	= 0x42,
-    CMD_READ_IMG_SEC	= 0x43,
-    CMD_WRITE_IMG_SEC	= 0x44,
-    CMD_SER_IMG_INFO	= 0x45,
-    CMD_VALID_IMG_NAMES	= 0x46,
-    CMD_IMG_UNMOUNT	= 0x47,
+	CMD_LOAD_PARAM		= 0x40,
+	CMD_GET_IMG_STATUS	= 0x41,
+	CMD_GET_IMG_NAME	= 0x42,
+	CMD_READ_IMG_SEC	= 0x43,
+	CMD_WRITE_IMG_SEC	= 0x44,
+	CMD_SER_IMG_INFO	= 0x45,
+	CMD_VALID_IMG_NAMES	= 0x46,
+	CMD_IMG_UNMOUNT		= 0x47,
 
 // UTIL_CMD_REG commands
-    CMD_GET_CARD_TYPE	= 0x80,
-    CMD_GET_FW_VER	= 0xE0,
-    CMD_GET_BL_VER	= 0xE1,
+	CMD_GET_CARD_TYPE	= 0x80,
+	CMD_GET_FW_VER		= 0xE0,
+	CMD_GET_BL_VER		= 0xE1,
 
 // Status codes
-    STATUS_OK		= 0x3F,
-    STATUS_COMPLETE	= 0x40,
-    STATUS_EOF		= 0x60,
-    STATUS_BUSY		= 0x80,
-    ERROR_MASK		= 0x3F,
+	STATUS_OK			= 0x3F,
+	STATUS_COMPLETE		= 0x40,
+	STATUS_EOF			= 0x60,
+	STATUS_BUSY			= 0x80,
+	ERROR_MASK			= 0x3F,
 
 // To be or'd with STATUS_COMPLETE
-    ERROR_NO_DATA	= 0x08,
-    ERROR_INVALID_DRIVE	= 0x09,
-    ERROR_READ_ONLY	= 0x0A,
-    ERROR_ALREADY_MOUNT	= 0x0A,
-    ERROR_TOO_MANY_OPEN	= 0x12,
+	ERROR_NO_DATA		= 0x08,
+	ERROR_INVALID_DRIVE	= 0x09,
+	ERROR_READ_ONLY		= 0x0A,
+	ERROR_ALREADY_MOUNT	= 0x0A,
+	ERROR_TOO_MANY_OPEN	= 0x12,
 
 // Global vars
 
-    dFilename = "",			// Filename loaded diskfile
-    dDisk,				// Array with diskimage loaded diskfile
-    filenum,				// Filenumber for RAF
-    debug = ARGV.debug * 1,		// Output to debug window on/off
+	dFilename = "",				// Filename loaded diskfile
+	dDisk,						// Array with diskimage loaded diskfile
+	filenum,					// Filenumber for RAF
+	debug = ARGV.debug * 1,		// Output to debug window on/off
 
 // AtoMMC vars
-    LATD = 255,				// Data latch
-    globalData = [],			// Data array 
-    globalIndex = 0,			// Data array pointer
-    byteValueLatch,			// Latch bytevalue
-    globalLBAOffset = 0,		// Disk image array pointer
+	LATD = 255,					// Data latch
+	globalData = [],			// Data array
+	globalIndex = 0,			// Data array pointer
+	byteValueLatch,				// Latch bytevalue
+	globalLBAOffset = 0,		// Disk image array pointer
 
 // Drive vars
-    aDisks=[],				// Array with disk images
-    lastDriveNo = -1,
-    globalCurDrive = 0,			// Current selected Drive
-    sFilter = "",              	        // Filterstring
-    DirPointer = 0;			// Directory counter
+	aDisks=[],					// Array with disk images
+	lastDriveNo = -1,
+	globalCurDrive = 0,			// Current selected Drive
+	sFilter = "",				// Filterstring
+	DirPointer = 0;				// Directory counter
 
-    function Struct(val1,name, val2)	// Structure for driveinfo table
-    {
-      this.basesector = val1;
-      this.filename = name;
-      this.attribs = val2;
-      this.image = [];
-    }    
+function Struct(val1,name, val2)	// Structure for driveinfo table
+{
+	this.basesector = val1;
+	this.filename = name;
+	this.attribs = val2;
+	this.image = [];
+}
 
-    driveInfo = [];			// Drive info table
-    driveInfo[0] = new Struct(0,"",255);
-    driveInfo[1] = new Struct(0,"",255);
-    driveInfo[2] = new Struct(0,"",255);
-    driveInfo[3] = new Struct(0,"",255);
+	driveInfo = [];			// Drive info table
+	driveInfo[0] = new Struct(0,"",255);
+	driveInfo[1] = new Struct(0,"",255);
+	driveInfo[2] = new Struct(0,"",255);
+	driveInfo[3] = new Struct(0,"",255);
 
 
 /*
@@ -111,7 +113,7 @@ var
 
 ;--------------------------------------------------------------
 ;
-; fMMCRead(nAddr) 
+; fMMCRead(nAddr)
 ;
 ; Read AtoMMC register nAddr
 ;  #B400 - CMD_REG
@@ -136,7 +138,7 @@ function fMMCRead(nAddr)
             // any data read requests must be primed by writing CMD_INIT_READ (0x3f) here
             // before the 1st read.
             //
-            // this has to be done this way as the PIC hardware only latches the address 
+            // this has to be done this way as the PIC hardware only latches the address
             // on a WRITE.
             WriteDataPort(globalData[globalIndex]);
             ++globalIndex;
@@ -156,7 +158,7 @@ function fMMCRead(nAddr)
 /*
 ;--------------------------------------------------------------
 ;
-; fMMCWrite(nAddr,nVal) 
+; fMMCWrite(nAddr,nVal)
 ;
 ; Write value nVal to AtoMMC register nAddr
 ;  #B400 - CMD_REG
@@ -181,7 +183,7 @@ function fMMCWrite(nAddr,nVal)
 	      filenum = (received >> 5) & 3;
 	      received &= 0x9F;
 	    }
-	    
+
 	    // Data Group 0x20-0x23, 0x24-0x27, 0x28-0x2B, 0x2C-0x2F
 	    // filenum = bits 3,2
 	    // mask1 = 11110000 (test for data group command)
@@ -277,7 +279,7 @@ function fMMCWrite(nAddr,nVal)
                     }
                     WriteDataPort(Ret);
                     break;
- 
+
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -309,15 +311,15 @@ function fMMCWrite(nAddr,nVal)
 
                 case CMD_INIT_READ:
                     // All data read requests must send CMD_INIT_READ before begining reading
-                    // data from READ_DATA_PORT. After execution of this command the first byte 
+                    // data from READ_DATA_PORT. After execution of this command the first byte
                     // of data may be read from the READ_DATA_PORT.
                     WriteDataPort(globalData[0]);
                     globalIndex = 1;
                     break;
 
                 case CMD_INIT_WRITE:
-                    // all data write requests must send CMD_INIT_WRITE here before poking data at 
-                    // WRITE_DATA_REG    
+                    // all data write requests must send CMD_INIT_WRITE here before poking data at
+                    // WRITE_DATA_REG
                     // globalDataPresent is a flag to indicate whether data is present in the bfr.
                     globalIndex = 0;
                     globalData = [];
@@ -334,7 +336,7 @@ function fMMCWrite(nAddr,nVal)
                 case CMD_WRITE_BYTES:
                     // replaces WRITE_BYTES_REG
                     // Must be previously written to latch reg.
-                    globalAmount = byteValueLatch;	
+                    globalAmount = byteValueLatch;
                     worker = WFN_FileWrite;
 
                 case CMD_EXEC_PACKET:
@@ -396,7 +398,7 @@ function fMMCWrite(nAddr,nVal)
                 case CMD_WRITE_IMG_SEC:
                     // write image sector
                     var returnCode = STATUS_COMPLETE | ERROR_INVALID_DRIVE;
-   
+
                     if (driveInfo[globalCurDrive].attribs != 0xff)
                     {
                         if (driveInfo[globalCurDrive].attribs & 1)
@@ -404,7 +406,7 @@ function fMMCWrite(nAddr,nVal)
                             WriteDataPort(STATUS_COMPLETE | ERROR_READ_ONLY);
                             return;
                         }
-      
+
                         for (i = 0; i < 256; ++i)
                         {
                             driveInfo[globalCurDrive].image[globalLBAOffset + i ]=globalData[i];
@@ -431,7 +433,7 @@ function fMMCWrite(nAddr,nVal)
 
                     for (d = 0; d < 4; ++d){
 
-                      if (arg[d].length > 0){ 
+                      if (arg[d].length > 0){
                         newDiskName=arg[d];
                         globalData[0]=d;
 
@@ -442,7 +444,7 @@ function fMMCWrite(nAddr,nVal)
                             driveInfo[globalData[0]].image=aDisks[i][0].d;
                           }
                           if (i==aDisks.length){Ret=0x44}
-                        } 
+                        }
                       }
 
                     }
@@ -526,7 +528,7 @@ function fMMCWrite(nAddr,nVal)
 //            // any data read requests must be primed by writing CMD_INIT_READ (0x3f) here
 //            // before the 1st read.
 //            //
-//            // this has to be done this way as the PIC hardware only latches the address 
+//            // this has to be done this way as the PIC hardware only latches the address
 //            // on a WRITE.
 //            WriteDataPort((globalData[globalIndex]));
 //            ++globalIndex;
@@ -556,42 +558,42 @@ function fMMCWrite(nAddr,nVal)
 /*
 ;--------------------------------------------------------------
 ;
-; WriteDataPort(nVal) 
+; WriteDataPort(nVal)
 ;
-; Write value nVal to data latch 
+; Write value nVal to data latch
 ;
 ;--------------------------------------------------------------
 */
 
-function WriteDataPort(nVal){
-    LATD=nVal
+function WriteDataPort(nVal)
+{
+	LATD = nVal;
 }
 
 /*
 ;--------------------------------------------------------------
 ;
-; tDebug(sLine) 
+; tDebug(sLine)
 ;
-; Write sLine to debug window if debug<>0 
+; Write sLine to debug window if debug<>0
 ;
 ;--------------------------------------------------------------
 */
 
 function tDebug(sLine)
 {
-    if (debug){
-        document.getElementById('dDebug').value = document.getElementById('dDebug').value + sLine + "\r"
-        document.getElementById("dDebug").scrollTop = document.getElementById("dDebug").scrollHeight
-    }
+	if (debug) {
+		document.getElementById('fDebug').value = document.getElementById('fDebug').value + sLine + "\r";
+		document.getElementById("fDebug").scrollTop = document.getElementById("fDebug").scrollHeight; }
 }
 
 function tMessage(sLine)
 {
-        document.getElementById('dDebug').value = document.getElementById('dDebug').value + sLine + "\r"
-        document.getElementById("dDebug").scrollTop = document.getElementById("dDebug").scrollHeight
+	document.getElementById('fDebug').value = document.getElementById('fDebug').value + sLine + "\r";
+	document.getElementById("fDebug").scrollTop = document.getElementById("fDebug").scrollHeight;
 }
 
-function matchRuleShort(str, rule) {
-  return new RegExp("^" + rule.split("*").join(".*") + "$").test(str);
+function matchRuleShort(str, rule)
+{
+	return new RegExp("^" + rule.split("*").join(".*") + "$").test(str);
 }
-
