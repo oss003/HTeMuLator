@@ -155,9 +155,35 @@ FNZ	= function(AIR){FLG=FLG&F_N&F_Z|(AIR?AIR&FLN:FLZ)}		// Flags N & Z		- Negati
 // These need looking at closer; especially those shifting/rotating right (making operand > 256?)
 
 BAD	= function(AIR){ACC+=AIR+(FLG&FLC);FLG&=F_N&F_V&F_Z&F_C;ACC>BYT?(FLG|=FLV|FLC,ACC&=BYT):NUL;ACC?FLG|=ACC&FLN:FLG|=FLZ}
-DAD	= function(AIR){ACC=B2D[ACC]+B2D[AIR]+(FLG&FLC);FLG&=F_N&F_V&F_Z&F_C;ACC>=HND?(FLG|=FLC|FLV,ACC-=HND):NUL;ACC?FLG|=ACC&FLN:FLG|=FLZ;ACC=D2B[ACC]}
+//DAD	= function(AIR){ACC=B2D[ACC]+B2D[AIR]+(FLG&FLC);FLG&=F_N&F_V&F_Z&F_C;ACC>=HND?(FLG|=FLC|FLV,ACC-=HND):NUL;ACC?FLG|=ACC&FLN:FLG|=FLZ;ACC=D2B[ACC]}
+DAD	= function(AIR){
+var ah=0,al,tb=ACC+AIR+(FLG&FLC);
+FLG&=F_N&F_V&F_Z;
+if(!tb)FLG|=FLZ;
+al=(ACC&0x0F)+(AIR&0x0F)+(FLG&FLC);
+if(al>9){al-=10;al&=0x0F;ah=1}
+ah+=(ACC>>4)+(AIR>>4);
+if(ah&0x08)FLG|=FLN;
+if((((ah<<4)^ACC)&0x80)&&!((ACC^AIR)&0x80))FLG|=FLV;
+FLG&=F_C;
+if(ah>9){FLG|=FLC;ah-=10;ah&=0x0F}
+ACC=(al&0x0F)|(ah<<4)}
+
 BSB	= function(AIR){ACC-=AIR+(~FLG&FLC);FLG&=F_N&F_V&F_Z&F_C;ACC>NUL?FLG|=FLC:ACC?FLG|=FLV:FLG|=FLZ+FLC;FLG|=ACC&FLN;ACC&=BYT}
-DSB	= function(AIR){ACC=B2D[ACC]-B2D[AIR]-(~FLG&FLC);FLG&=F_N&F_V&F_Z&F_C;ACC>NUL?FLG|=FLC:ACC?(FLG|=FLN,ACC+=HND):FLG|=FLZ+FLC;ACC=D2B[ACC]}
+//DSB	= function(AIR){ACC=B2D[ACC]-B2D[AIR]-(~FLG&FLC);FLG&=F_N&F_V&F_Z&F_C;ACC>NUL?FLG|=FLC:ACC?(FLG|=FLN,ACC+=HND):FLG|=FLZ+FLC;ACC=D2B[ACC]}
+DSB	= function(AIR){
+var ah,al,hc=0,c=FLG&FLC?0:1,tb=ACC-AIR-c;
+FLG&=F_N&F_V&F_Z;
+if(!tb)FLG|=FLZ;
+al=(ACC&0x0F)-(AIR&0x0F)-c;
+if(al&0x10){al-=6;al&=0x0F;hc=1}
+ah=(ACC>>4)-(AIR>>4);
+if(hc)ah--;
+if((ACC-(AIR+c))&0x80)FLG|=FLN;
+if(((ACC^AIR)&0x80)&&((ACC^tb)&0x80))FLG|=FLV;
+FLG|=FLC;
+if(ah&0x10){FLG&=F_C;ah-=6;ah&=0x0F}
+ACC=(al&0x0F)|((ah&0x0F)<<4)}
 
 // COM	= function(AIR,BIR){FLG&=F_N&F_Z&F_C;AIR-BIR?AIR>BIR?FLG|=FLC:FLG|=FLN:FLG|=FLC|FLZ}	// COMpare
 COM	= function(AIR,BIR){FLG=FLG&124|(AIR-BIR?AIR<BIR?0:1:3)|((AIR-BIR)&128)}	// COMpare
@@ -599,6 +625,19 @@ void ADC(temp)
 		a = (al & 0x0F) | (ah << 4); }
 }
 
+DAD	= function(AIR){
+var ah=0,al,tb=ACC+AIR+(FLG&FLC);
+FLG&=F_N&F_V&F_Z;
+if(!tb)FLG|=FLZ;
+al=(ACC&0x0F)+(AIR&0x0F)+(FLG&FLC);
+if(al>9){al-=10;al&=0x0F;ah=1}
+ah+=(ACC>>4)+(AIR>>4);
+if(ah&0x08)FLG|=FLN;
+if((((ah<<4)^ACC)&0x80)&&!((ACC^AIR)&0x80))FLG|=FLV;
+FLG&=F_C;
+if(ah>9){FLG|=FLC;ah-=10;ah&=0x0F}
+ACC=(al&0x0F)|(ah<<4)}
+
 void SBC(temp)
 {
 	if (!p.d) {
@@ -629,5 +668,19 @@ void SBC(temp)
 			ah &= 0x0F; }
 		a = (al & 0x0F) | ((ah & 0x0F) << 4); }
 }
+
+DSB	= function(AIR){
+var ah,al,hc=0,c=FLG&FLC?0:1,tb=ACC-AIR-c;
+FLG&=F_N&F_V&F_Z;
+if(!tb)FLG|=FLZ;
+al=(ACC&0x0F)-(AIR&0x0F)-c;
+if(al&0x10){al-=6;al&=0x0F;hc=1}
+ah=(ACC>>4)-(AIR>>4);
+if(hc)ah--;
+if((ACC-(AIR+c))&0x80)FLG|=FLN;
+if(((ACC^AIR)&0x80)&&((ACC^tb)&0x80))FLG|=FLV;
+FLG|=FLC;
+if(ah&0x10){FLG&=F_C;ah-=6;ah&=0x0F}
+ACC=(al&0x0F)|((ah&0x0F)<<4)}
 
 */
