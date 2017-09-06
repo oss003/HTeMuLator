@@ -26,15 +26,15 @@
 
 var
 // PIC registers
-	CMD_REG				= 0x00,
-	LATCH_REG 			= 0x01,
+	CMD_REG			= 0x00,
+	LATCH_REG 		= 0x01,
 	READ_DATA_REG		= 0x02,
 	WRITE_DATA_REG		= 0x03,
 
 // DIR_CMD_REG commands
 	CMD_DIR_OPEN		= 0x00,
 	CMD_DIR_READ		= 0x01,
-	CMD_DIR_CWD			= 0x02,
+	CMD_DIR_CWD		= 0x02,
 
 // CMD_REG_COMMANDS
 	CMD_FILE_OPEN_IMG	= 0x12,
@@ -55,13 +55,16 @@ var
 	CMD_GET_CARD_TYPE	= 0x80,
 	CMD_GET_FW_VER		= 0xE0,
 	CMD_GET_BL_VER		= 0xE1,
+	CMD_GET_CFG_BYTE	= 0xF0,
+	CMD_SET_CFG_BYTE	= 0xF1,
+	CMD_GET_HEARTBEAT	= 0xFE,
 
 // Status codes
-	STATUS_OK			= 0x3F,
+	STATUS_OK		= 0x3F,
 	STATUS_COMPLETE		= 0x40,
-	STATUS_EOF			= 0x60,
-	STATUS_BUSY			= 0x80,
-	ERROR_MASK			= 0x3F,
+	STATUS_EOF		= 0x60,
+	STATUS_BUSY		= 0x80,
+	ERROR_MASK		= 0x3F,
 
 // To be or'd with STATUS_COMPLETE
 	ERROR_NO_DATA		= 0x08,
@@ -72,24 +75,27 @@ var
 
 // Global vars
 
-	dFilename = "",				// Filename loaded diskfile
-	dDisk,						// Array with diskimage loaded diskfile
-	filenum,					// Filenumber for RAF
+	dFilename = "",			// Filename loaded diskfile
+	dDisk,				// Array with diskimage loaded diskfile
+	filenum,			// Filenumber for RAF
 	debug = ARGV.debug * 1,		// Output to debug window on/off
 
 // AtoMMC vars
-	LATD = 255,					// Data latch
-	globalData = [],			// Data array
-	globalIndex = 0,			// Data array pointer
-	byteValueLatch,				// Latch bytevalue
+	LATD = 255,			// Data latch
+	globalData = [],		// Data array
+	globalIndex = 0,		// Data array pointer
+	byteValueLatch,			// Latch bytevalue
 	globalLBAOffset = 0,		// Disk image array pointer
+        heartbeat = 0x55,
+	autoboot = ARGV.autoboot * 1,
+	configByte = (autoboot == 0) ? 0xff : 0,		// Configuration byte AtoMMC
 
 // Drive vars
-	aDisks=[],					// Array with disk images
+	aDisks=[],			// Array with disk images
 	lastDriveNo = -1,
-	globalCurDrive = 0,			// Current selected Drive
-	sFilter = "",				// Filterstring
-	DirPointer = 0;				// Directory counter
+	globalCurDrive = 0,		// Current selected Drive
+	sFilter = "",			// Filterstring
+	DirPointer = 0;			// Directory counter
 
 function Struct(val1,name, val2)	// Structure for driveinfo table
 {
@@ -480,7 +486,6 @@ function fMMCWrite(nAddr,nVal)
                    WriteEEPROM(EE_PORTBVALU, byteValueLatch);
                    WriteDataPort(STATUS_OK);
 
-
                 case CMD_SET_CFG_BYTE) // write config byte
                    configByte = byteValueLatch;
                    WriteEEPROM(EE_SYSFLAGS, configByte);
@@ -489,14 +494,6 @@ function fMMCWrite(nAddr,nVal)
                 case CMD_READ_AUX) // read porta - latch & aux pin on dongle
                    WriteDataPort(LatchedAddress);
 
-                case CMD_GET_HEARTBEAT)
-                   // get heartbeat - this may be important as we try and fire
-                   // an irq very early to get the OS hooked before its first
-                   // osrdch call. the psp may not be enabled by that point,
-                   // so we have to wait till it is.
-                   //
-                   WriteDataPort(heartbeat);
-                   heartbeat ^= 0xff;
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
@@ -515,6 +512,27 @@ function fMMCWrite(nAddr,nVal)
                     byteValueLatch = nVal;
                     WriteDataPort(1);
                     break;
+
+		case CMD_GET_CFG_BYTE:
+		    // read config byte
+	            WriteDataPort(configByte);
+		    break;
+
+		case CMD_SET_CFG_BYTE:
+		    // write config byte
+                    configByte = byteValueLatch;
+                    WriteDataPort(STATUS_OK);
+                    break;
+
+                case CMD_GET_HEARTBEAT:
+                   // get heartbeat - this may be important as we try and fire
+                   // an irq very early to get the OS hooked before its first
+                   // osrdch call. the psp may not be enabled by that point,
+                   // so we have to wait till it is.
+                   //
+                   WriteDataPort(heartbeat);
+                   heartbeat ^= 0xff;
+                   break;
 
                 default:
                     WriteDataPort(STATUS_OK);

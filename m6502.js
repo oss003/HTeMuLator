@@ -154,10 +154,20 @@ FNZ	= function(AIR){FLG=FLG&F_N&F_Z|(AIR?AIR&FLN:FLZ)}		// Flags N & Z		- Negati
 
 // These need looking at closer; especially those shifting/rotating right (making operand > 256?)
 
-BAD	= function(AIR){ACC+=AIR+(FLG&FLC);FLG&=F_N&F_V&F_Z&F_C;ACC>BYT?(FLG|=FLV|FLC,ACC&=BYT):NUL;ACC?FLG|=ACC&FLN:FLG|=FLZ}
+//BAD	= function(AIR){ACC+=AIR+(FLG&FLC);FLG&=F_N&F_V&F_Z&F_C;ACC>BYT?(FLG|=FLV|FLC,ACC&=BYT):NUL;ACC?FLG|=ACC&FLN:FLG|=FLZ}
+
+BAD = function(AIR){
+var sum=ACC+AIR+(FLG&FLC);
+FLG&=F_N&F_V&F_Z&F_C;
+if ((ACC^sum)&(AIR^sum)&0x80) FLG|=FLV;
+if (sum > BYT) FLG|=FLC;
+ACC=sum&BYT;FLG|=ACC&FLN;if (!ACC) FLG|=FLZ
+}
+
 //DAD	= function(AIR){ACC=B2D[ACC]+B2D[AIR]+(FLG&FLC);FLG&=F_N&F_V&F_Z&F_C;ACC>=HND?(FLG|=FLC|FLV,ACC-=HND):NUL;ACC?FLG|=ACC&FLN:FLG|=FLZ;ACC=D2B[ACC]}
-DAD	= function(AIR){
-var ah=0,al,tb=ACC+AIR+(FLG&FLC);
+
+DAD = function(AIR){
+var ah=0,al,tb=(ACC+AIR+(FLG&FLC))&BYT;
 FLG&=F_N&F_V&F_Z;
 if(!tb)FLG|=FLZ;
 al=(ACC&0x0F)+(AIR&0x0F)+(FLG&FLC);
@@ -169,10 +179,20 @@ FLG&=F_C;
 if(ah>9){FLG|=FLC;ah-=10;ah&=0x0F}
 ACC=(al&0x0F)|(ah<<4)}
 
-BSB	= function(AIR){ACC-=AIR+(~FLG&FLC);FLG&=F_N&F_V&F_Z&F_C;ACC>NUL?FLG|=FLC:ACC?FLG|=FLV:FLG|=FLZ+FLC;FLG|=ACC&FLN;ACC&=BYT}
+//BSB	= function(AIR){ACC-=AIR+(~FLG&FLC);FLG&=F_N&F_V&F_Z&F_C;ACC>NUL?FLG|=FLC:ACC?FLG|=FLV:FLG|=FLZ+FLC;FLG|=ACC&FLN;ACC&=BYT}
+
+BSB = function(AIR){
+var diff=ACC-AIR-(~FLG&FLC);
+FLG&=F_N&F_V&F_Z&F_C;
+if ((ACC^AIR)&(ACC^diff)&0x80) FLG|=FLV;
+if (diff >= 0) FLG|=FLC;
+ACC=diff&BYT;FLG|=ACC&FLN;if (!ACC) FLG|=FLZ
+}
+
 //DSB	= function(AIR){ACC=B2D[ACC]-B2D[AIR]-(~FLG&FLC);FLG&=F_N&F_V&F_Z&F_C;ACC>NUL?FLG|=FLC:ACC?(FLG|=FLN,ACC+=HND):FLG|=FLZ+FLC;ACC=D2B[ACC]}
-DSB	= function(AIR){
-var ah,al,hc=0,c=FLG&FLC?0:1,tb=ACC-AIR-c;
+
+DSB = function(AIR){
+var ah,al,hc=0,c=FLG&FLC?0:1,tb=(ACC-AIR-c)&BYT;
 FLG&=F_N&F_V&F_Z;
 if(!tb)FLG|=FLZ;
 al=(ACC&0x0F)-(AIR&0x0F)-c;
@@ -251,7 +271,7 @@ NOP	= function(){}
 
 // Illegal Instructions
 
-N0P	= function(){fLog("Invalid OP code for "+NME);PCR++} // Note '0' (Zero) in N0P not capital letter 'O' ;-)
+N0P	= function(){fLog("Invalid OP code for "+NME + " AT#" + PCR.toString(16));PCR++} // Note '0' (Zero) in N0P not capital letter 'O' ;-)
 
 // Instruction Codes Table - 256 OpCodes; 151 Instructions (105 unused); 56 Operations
 

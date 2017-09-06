@@ -9,7 +9,7 @@
 				0.0 - 2011		- Initial version Phil Mainwaring
 				0.1 - 2012-2017	- Phil Mainwaring
 				0.2 - 20170808	- Source structered Kees van Oss
-
+				0.3 - 20170906  - 6502 flags issues solved by David Banks
 			TESTS:
 				Internet Explorer 9.0.8112.16421;
 				Google Chrome 10.0.648.204;
@@ -57,24 +57,24 @@
 				-	graphic (image) of a joystick for mouse/touchscreen joystick emulation
 				-	GamePad API or keyboard/port based joystick
 				-	ROM traps for cut and paste - Paste inserts into keyboard stream and cut is from a printer output window
-				-	Misc jobs in m6502.js
 				-	Make processor (and system) into proper objects so that we can have many windowed Atoms running simulataneously
 				-	Force the browser to start in fullscreen mode (F11)
-				-	Add #BFFF support for switching util ROMS at #Axxx
-				-	Add a utils.js file with 8 rom images to be selected through #BFFF
-				-	Add ARGV properties disk 0, 1, 2, 3 to override BOOTDRV.CFG
-				-	Add ARGV property autoboot to force SDDOS to start *MENU
 				-	Adjust canvas at startup to get all modes working correct
 				-	Dynamic loading of disk images
 				-	Save buffer using save form
-				-	Normally SDDOS has a CONFIG file, a backup of the driveInfo table. When you start SDDOS,
-					CONFIG is read and the according disk images are mounted
-				-	Add mounting disks from the command line. This way we can get the Software Archive running
 				-	Emulate SID chip
 				-	Check differences in character set between Atomulator and HTeMuLator: E V [ ] " ' ( ) , . : ; >
 
 			DONE:
 				*	Relocate SDDOS to #Exxx and make it autoboot like the AtoMMC ROM								DONE
+				*	Misc jobs in m6502.js
+				*	Add #BFFF support for switching util ROMS at #Axxx
+				*	Add a utils.js file with 8 rom images to be selected through #BFFF
+				*	Add ARGV properties disk 0, 1, 2, 3 to override BOOTDRV.CFG
+				*	Add ARGV property autoboot to force SDDOS to start *MENU
+				*	Normally SDDOS has a CONFIG file, a backup of the driveInfo table. When you start SDDOS,
+					CONFIG is read and the according disk images are mounted
+				*	Add mounting disks from the command line. This way we can get the Software Archive running
 
 		-->
 
@@ -203,6 +203,7 @@ function VARG_type()	// VARG (Variable ARGument) defaults
 	this.disk3 = "";
 	this.tape = "";
 	this.prog = "";
+	this.autoboot = "";
 }
 
 function VARG_get(o)

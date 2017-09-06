@@ -119,8 +119,11 @@ function LDBA(a,A)
 		case 11:return fIOR(a)&0xff;						// 0xB000-0xBFFF
 		case 12:return sFxxxPatch_ROM.charCodeAt(a-49152);	// 0xC000-0xCFFF
 		case 13:return sAFloat_IC21.charCodeAt(a-53248);	// 0xD000-0xDFFF
+
 //		case 14:return sDOSROM_U15.charCodeAt(a-57344);		// 0xE000-0xEFFF
+//		case 14:return sMMC297E_ROM.charCodeAt(a-57344);	// 0xE000-0xEFFF
 		case 14:return sSDROMe_ROM.charCodeAt(a-57344);		// 0xE000-0xEFFF
+
 		case 15:return sFxxxPatch_ROM.charCodeAt(a-57344);}	// 0xF000-0xFFFF
 }
 
