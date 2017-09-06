@@ -53,6 +53,8 @@ var
 
 // UTIL_CMD_REG commands
 	CMD_GET_CARD_TYPE	= 0x80,
+	CMD_SET_PORT_DDR	= 0xA1,
+	CMD_READ_PORT		= 0xA2,
 	CMD_GET_FW_VER		= 0xE0,
 	CMD_GET_BL_VER		= 0xE1,
 	CMD_GET_CFG_BYTE	= 0xF0,
@@ -135,9 +137,14 @@ function fMMCRead(nAddr)
     switch (A=nAddr&7){
 
         case CMD_REG:
-            Ret = LATD;
-            break;
+          Ret = LATD;
+          break;
 
+        case LATCH_REG:
+          // latch the written value
+          WriteDataPort(byteValueLatch);
+          break;
+ 
         case READ_DATA_REG:
             // read data port.
             //
@@ -210,6 +217,8 @@ function fMMCWrite(nAddr,nVal)
                     // when 0x3f is read back from this register it is appropriate to
                     // start sending cmd 1s to get items.
                     //
+                    var StopFlag;
+
                     sFilter="";
                     for (i = 0; i < globalData.length -1; ++i){
                       sFilter = sFilter + String.fromCharCode(globalData[i]);
@@ -220,16 +229,25 @@ function fMMCWrite(nAddr,nVal)
                     break;
 
                 case CMD_DIR_READ:
+                    var FileName = [];
+
                     if (aDisks.length !== 0){
                        if (DirPointer !== aDisks.length){
                          // get next directory entry
                          //
-                         for (i = 0; i < aDisks[DirPointer][0].n.length; ++i){
-                           globalData[i+1]=aDisks[DirPointer][0].n[i];
+                         while (matchRuleShort(aDisks[DirPointer][0].n, sFilter) == false && DirPointer !== aDisks.length-1){
+                           ++DirPointer;
                          }
-                         globalData[i+1]=0;
-                         ++DirPointer;
-                         WriteDataPort(STATUS_OK);
+                         if (matchRuleShort(aDisks[DirPointer][0].n, sFilter) == true && DirPointer !== aDisks.length){
+                           for (i = 0; i < aDisks[DirPointer][0].n.length; ++i){
+                             globalData[i+1]=aDisks[DirPointer][0].n[i];
+                           }
+                           globalData[i+1]=0;
+                           if (DirPointer < aDisks.length){++DirPointer};
+                           WriteDataPort(STATUS_OK);
+                         } else {
+                           WriteDataPort(STATUS_COMPLETE);
+                         }
                          break;
                        } else {
                          // done
@@ -470,25 +488,10 @@ function fMMCWrite(nAddr,nVal)
                    // get portb direction register
                    WriteDataPort(TRISB);
 
-                case CMD_SET_PORT_DDR;
-                   // set portb direction register
-                   TRISB = byteValueLatch;
-                   WriteEEPROM(EE_PORTBTRIS, byteValueLatch);
-                   WriteDataPort(STATUS_OK);
-
-                case CMD_READ_PORT;
-                   // read portb
-                   WriteDataPort(PORTB);
-
                 case CMD_WRITE_PORT;
                    // write port B value
                    LATB = byteValueLatch;
                    WriteEEPROM(EE_PORTBVALU, byteValueLatch);
-                   WriteDataPort(STATUS_OK);
-
-                case CMD_SET_CFG_BYTE) // write config byte
-                   configByte = byteValueLatch;
-                   WriteEEPROM(EE_SYSFLAGS, configByte);
                    WriteDataPort(STATUS_OK);
 
                 case CMD_READ_AUX) // read porta - latch & aux pin on dongle
@@ -518,6 +521,15 @@ function fMMCWrite(nAddr,nVal)
 	            WriteDataPort(configByte);
 		    break;
 
+                case CMD_SET_PORT_DDR:
+                   // set portb direction register
+                   WriteDataPort(STATUS_OK);
+
+                case CMD_READ_PORT:
+                    // read portb
+                    WriteDataPort(0xff);
+                    break;
+
 		case CMD_SET_CFG_BYTE:
 		    // write config byte
                     configByte = byteValueLatch;
@@ -539,19 +551,6 @@ function fMMCWrite(nAddr,nVal)
             }
             break;
         }
-
-//        case READ_DATA_REG: {
-//            // read data port.
-//            //
-//            // any data read requests must be primed by writing CMD_INIT_READ (0x3f) here
-//            // before the 1st read.
-//            //
-//            // this has to be done this way as the PIC hardware only latches the address
-//            // on a WRITE.
-//            WriteDataPort((globalData[globalIndex]));
-//            ++globalIndex;
-//            break;
-//       }
 
         case WRITE_DATA_REG:{
             // write data port.
