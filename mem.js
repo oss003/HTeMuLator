@@ -89,18 +89,13 @@ function fIOPoll(c)
 
 function fIOR(a,A)
 {
-	if (a>=0xB000 && a<=0xB003){return fPIAR(a&3)}
-	if (a>=0xB010 && a<=0xB20f){
-          return sBRAN_B010[a-45072].charCodeAt(0)
-        }
-	if (a>=0xB400 && a<=0xB403){return fMMCRead(a)}
-	if (a>=0xB410 && a<=0xB6ac){
-          return sBRAN_B410[a-46096].charCodeAt(0)
-        }
-	if (a>=0xB800 && a<=0xB80F){return fVIARead(a)}
-	if (a>=0xB000 && a<=0xB03){return fPIAR(a&3)}
-
-//	return(A=(a>>10)&3)?A-1?A-2?fBCxxRead(a):fVIARead(a):fMMCRead(a):fPIAR(a&3)
+	if (a>=0xB000 && a<=0xB003){return fPIAR(a&3)}				// PIA
+	if (a>=0xB010 && a<=0xB20f){return sBRAN_B010[a-45072].charCodeAt(0)}	// BRAN1
+	if (a>=0xB400 && a<=0xB403){return fMMCRead(a)}				// ATOMMC
+	if (a>=0xB410 && a<=0xB6ac){return sBRAN_B410[a-46096].charCodeAt(0)}	// BRAN2
+	if (a>=0xB800 && a<=0xB80F){return fVIARead(a)}				// VIA
+	if (a>=0xBfff){return ROMnr}						// BFFF
+        return a>>8
 }
 
 function fIOW(a,v)
