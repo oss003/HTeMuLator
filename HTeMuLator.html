@@ -261,6 +261,9 @@ var
 	onEvent=(function(a){return function(o,e,f,c){if(!a)a=o.addEventListener?function(o,e,f,c){o.addEventListener(e,f,c)}:o.attachEvent?function(o,e,f,c){o.attachEvent("on"+e,f),c}:function(o,e,f){o["on"+e]=f};a(o,e,f,c)}}()),
 
 	ARGV = new VARG_type(),
+	debug = ARGV.debug * 1,		// Output to debug window on/off
+
+
 	oRSG,
 
 	sBase64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";	// All capital letters

@@ -3,40 +3,97 @@
 ; BCxx.js, IO addresses #BC00-#BFFF                     KC 2017
 ;--------------------------------------------------------------
 ;
-; #BFFF, #Axxx switchbyte.
-;        Select romnr #BFFF for #Axxx
+; RAMROM emulation at #BFFE/F
+;    #BFFE - Status register RAMROM board
+;    #BFFF - Switch byte util roms at #Axxx
 ;
 ;==============================================================
 */
 
-var	ROMnr=0,
-	aAxxxROM = [],
-	aUtilRoms = [];
-	aUtilRoms[0] = sAXR1_ROM;
-	aUtilRoms[1] = sPCHARM_ROM;
-	aUtilRoms[2] = sAWROM_ROM;
-	aUtilRoms[3] = sGAGS_ROM;
-	aUtilRoms[4] = sPP_TOOLKIT_ROM;
-	aUtilRoms[5] = sWATFORD_ROM;
-	aUtilRoms[6] = sFPGA_UTILS_ROM;
-	aUtilRoms[7] = sSDROM_ROM;
+/*
+;==============================================================
+; DEFINITION OF VARIABLES
+;==============================================================
+;
+*/
+
+var
+// Dis-/enable hardware emulation for devices
+        bRAMROM_enable = true;
+
+        aBFFE=0,
+        aBFFF=0,
+
+        aAxxxROM = [],
+        aUtilRoms = [];
+
+        aUtilRoms[0] = sAXR1_ROM;
+        aUtilRoms[1] = sPCHARM_ROM;
+        aUtilRoms[2] = sAWROM_ROM;
+        aUtilRoms[3] = sGAGS_ROM;
+        aUtilRoms[4] = sPP_TOOLKIT_ROM;
+        aUtilRoms[5] = sWATFORD_ROM;
+        aUtilRoms[6] = sFPGA_UTILS_ROM;
+        aUtilRoms[7] = sSDROM_ROM;
+
+/*
+;--------------------------------------------------------------
+;
+; fBCxxRead(nAddr)
+;
+; Read address nAddr in range #BC00-#BFFF
+;
+;--------------------------------------------------------------
+*/
 
 function fBCxxRead(nAddr){
   switch (a = nAddr){
+
+    case 0xbffe:
+      return bRAMROM_enable ? aBFFE : a>>8;
+
     case 0xbfff:
-      return (ROMnr&7);
+      return bRAMROM_enable ? aBFFF : a>>8;
+
     default:
 //     tMessage ("Read " + nAddr.toString(16) + " PC:" + PCR.toString(16));
 
   }
 }
 
+/*
+;--------------------------------------------------------------
+;
+; fBCxxWrite(nAddr,nVal)
+;
+; Write value nVal at address nAddr in range #BC00-#BFFF
+;
+;--------------------------------------------------------------
+*/
+
 function fBCxxWrite(nAddr,nVal){
   switch (a = nAddr){
+
+    case 0xbffe:
+      if (bRAMROM_enable){
+        aBFFE=nVal;
+        return aBFFE;
+      } else {
+        aBFFE=0;
+        return 0;
+      }
+
     case 0xbfff:
-      ROMnr = nVal&7;
-      return (ROMnr);
+      if (bRAMROM_enable){
+        aBFFF = nVal&7;
+        return (aBFFF);
+      } else {
+        aBFFF = 0;
+        return 0;
+      }
+
     default:
 //      tMessage ("Write " + nAddr.toString(16) + "," + nVal+ " PC:" + PCR.toString(16));
+
   }
 }
