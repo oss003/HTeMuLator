@@ -18,6 +18,7 @@
 var
 // Dis-/enable hardware emulation for devices
         bAtoMMC_enable = true,
+	debug = ARGV.debug * 1,		// Output to debug window on/off
 
 // AtoMMC vars
 	CMD_REG			= 0x00,	// PIC registers
@@ -27,11 +28,24 @@ var
 
 	CMD_DIR_OPEN		= 0x00,	// DIR_CMD_REG commands
 	CMD_DIR_READ		= 0x01,
-	CMD_DIR_CWD		= 0x02,
+//	CMD_DIR_CWD		= 0x02,
 
-	CMD_FILE_OPEN_IMG	= 0x12,	// CMD_REG_COMMANDS
+//	CMD_FILE_CLOSE		= 0x10,	// CMD_REG_COMMANDS
+	CMD_FILE_OPEN_READ	= 0x11,
+	CMD_FILE_OPEN_IMG	= 0x12,
+//	CMD_FILE_OPEN_WRITE	= 0x13,
+//	CMD_FILE_DELETE		= 0x14,
+//	CMD_FILE_GETINFO	= 0x15,
+//	CMD_FILE_SEEK		= 0x16,
+//	CMD_FILE_OPEN_RAF       = 0x17,
+
 	CMD_INIT_READ		= 0x20,
 	CMD_INIT_WRITE		= 0x21,
+	CMD_READ_BYTES		= 0x22,
+//	CMD_WRITE_BYTES		= 0x23,
+
+
+//	CMD_EXEC_PACKET		= 0x3F,	// EXEC_PACKET_REG "commands"
 
 	CMD_LOAD_PARAM		= 0x40,	// SDOS_LBA_REG commands
 	CMD_GET_IMG_STATUS	= 0x41,
@@ -43,8 +57,10 @@ var
 	CMD_IMG_UNMOUNT		= 0x47,
 
 	CMD_GET_CARD_TYPE	= 0x80,	// UTIL_CMD_REG commands
+//	CMD_GET_PORT_DDR	= 0xA0,
 	CMD_SET_PORT_DDR	= 0xA1,
 	CMD_READ_PORT		= 0xA2,
+//	CMD_WRITE_PORT		= 0xA3,
 	CMD_GET_FW_VER		= 0xE0,
 	CMD_GET_BL_VER		= 0xE1,
 	CMD_GET_CFG_BYTE	= 0xF0,
@@ -63,6 +79,9 @@ var
 	ERROR_ALREADY_MOUNT	= 0x0A,
 	ERROR_TOO_MANY_OPEN	= 0x12,
 
+
+	FILENUM_OFFSET		= 0x20,	// Offset returned file numbers by 0x20, to disambiguate from errors
+
 	filenum,			// Filenumber for RAF
 	LATD = 255,			// Data latch
 	globalData = [],		// Data array
@@ -74,10 +93,11 @@ var
 	configByte = (autoboot == 0) ? 0xff : 0,	// Configuration byte AtoMMC
 
 // SDROM vars
-	aDisks=[],			// Array with disk images
 	globalCurDrive = 0,		// Current selected Drive
 	sFilter = "",			// Filterstring
-	DirPointer = 0;			// Directory counter
+	DirPointer = 0,			// Directory pointer Disk array
+	FilePointer = 0,		// File pointer Tape array
+	BytePointer = 0;                // Pointer within file
 
 function Struct(val1,name, val2)	// Structure for driveinfo table
 {
@@ -205,25 +225,26 @@ function fMMCWrite(nAddr,nVal){
               for (i = 0; i < globalData.length -1; ++i){
                 sFilter = sFilter + String.fromCharCode(globalData[i]);
               }
+              if (sFilter.charCodeAt(0)==0 || sFilter==""){sFilter="*";}
               DirPointer = 0;
               globalData = [];
               WriteDataPort(STATUS_OK);
               break;
 
             case CMD_DIR_READ:
-              if (aDisks.length !== 0){
-                if (DirPointer !== aDisks.length){
+              if (aFileData.length !== 0){
+                if (DirPointer !== aFileData.length){
                   // get next directory entry
                   //
-                  while (matchRuleShort(aDisks[DirPointer][0].n, sFilter) == false && DirPointer !== aDisks.length-1){
+                  while (matchRuleShort(aFileData[DirPointer][0].n, sFilter) == false && DirPointer !== aFileData.length-1){
                     ++DirPointer;
                   }
-                  if (matchRuleShort(aDisks[DirPointer][0].n, sFilter) == true && DirPointer !== aDisks.length){
-                    for (i = 0; i < aDisks[DirPointer][0].n.length; ++i){
-                      globalData[i+1]=aDisks[DirPointer][0].n[i];
+                  if (matchRuleShort(aFileData[DirPointer][0].n, sFilter) == true && DirPointer !== aFileData.length){
+                    for (i = 0; i < aFileData[DirPointer][0].n.length; ++i){
+                      globalData[i+1]=aFileData[DirPointer][0].n[i];
                     }
                     globalData[i+1]=0;
-                    if (DirPointer < aDisks.length){++DirPointer};
+                    if (DirPointer < aFileData.length){++DirPointer};
                     WriteDataPort(STATUS_OK);
                   } else {
                     WriteDataPort(STATUS_COMPLETE);
@@ -251,12 +272,36 @@ function fMMCWrite(nAddr,nVal){
               //
               worker = WFN_FileClose;
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
             case CMD_FILE_OPEN_READ:
               // open the file with name in global data buffer
               //
-              worker = WFN_FileOpenRead;
+              var sFileName = "",m=0;
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+              // Read filename
+              for (i = 0; i < globalData.length -1; ++i){
+                sFileName = sFileName + String.fromCharCode(globalData[i]);
+              }
+
+              // Find filename in Tape array
+              res = 4;
+              FilePointer = -1;
+              for (i = 0; i < aFileData.length ; ++i){
+                if (aFileData[i][0].n == sFileName){
+                  FilePointer = i;
+                  res = 0;
+                  break;
+                }
+              }
+
+              if (filenum < 4) { 
+//                FILINFO *filinfo = &filinfodata[filenum];
+//                get_fileinfo_special(filinfo);
+              }
+              BytePointer = 0;
+              WriteDataPort(STATUS_COMPLETE | res);
+              break;
 
             case CMD_FILE_OPEN_IMG:
               // open the file as backing image for virtual floppy drive
@@ -273,11 +318,11 @@ function fMMCWrite(nAddr,nVal){
                 ++n;
               }
 
-              for (i = 0; i < aDisks.length; ++i){
-                if (aDisks[i][0].n == newDiskName){
+              for (i = 0; i < aFileData.length; ++i){
+                if (aFileData[i][0].n == newDiskName){
                   driveInfo[globalData[0]].filename = newDiskName;
                   driveInfo[globalData[0]].attribs=0;
-                  driveInfo[globalData[0]].image=aDisks[i][0].d;
+                  driveInfo[globalData[0]].image=aFileData[i][0].d;
                   Ret=STATUS_OK;
                   break;
                 }
@@ -331,13 +376,20 @@ function fMMCWrite(nAddr,nVal){
               globalData = [];
               break;
 
-/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
             case CMD_READ_BYTES:
               // Replaces READ_BYTES_REG
               // Must be previously written to latch reg.
-              globalAmount = byteValueLatch;
-              worker = WFN_FileRead;
+              if (FilePointer !== -1){
+                if (byteValueLatch == 0){byteValueLatch = 256};
+                for (i = 0; i < byteValueLatch; ++i){
+                  globalData[i+1]=aFileData[FilePointer][0].d[BytePointer];
+                  ++BytePointer;
+                }
+              }
+              WriteDataPort(STATUS_COMPLETE);
+              break;
+
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
             case CMD_WRITE_BYTES:
               // replaces WRITE_BYTES_REG
@@ -429,6 +481,7 @@ function fMMCWrite(nAddr,nVal){
               // try to read the boot config file
               var Ret=STATUS_OK,d,arg=[];
 
+                if (nFileSystem == 1){aFileData=aDisks.concat([]);}
               arg[0]=ARGV.disk0.toUpperCase();
               arg[1]=ARGV.disk1.toUpperCase();
               arg[2]=ARGV.disk2.toUpperCase();
@@ -438,13 +491,13 @@ function fMMCWrite(nAddr,nVal){
                 if (arg[d].length > 0){
                   newDiskName=arg[d];
                   globalData[0]=d;
-                  for (i = 0; i < aDisks.length; ++i){
-                    if (aDisks[i][0].n == newDiskName){
+                  for (i = 0; i < aFileData.length; ++i){
+                    if (aFileData[i][0].n == newDiskName){
                       driveInfo[globalData[0]].filename = newDiskName;
                       driveInfo[globalData[0]].attribs=0;
-                      driveInfo[globalData[0]].image=aDisks[i][0].d;
+                      driveInfo[globalData[0]].image=aFileData[i][0].d;
                     }
-                    if (i==aDisks.length){Ret=0x44}
+                    if (i==aFileData.length){Ret=0x44}
                   }
                 }
               }
@@ -469,9 +522,6 @@ function fMMCWrite(nAddr,nVal){
               LATB = byteValueLatch;
               WriteEEPROM(EE_PORTBVALU, byteValueLatch);
               WriteDataPort(STATUS_OK);
-
-            case CMD_READ_AUX) // read porta - latch & aux pin on dongle
-              WriteDataPort(LatchedAddress);
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 

@@ -21,7 +21,7 @@ var
 // Dis-/enable hardware emulation for devices
         bRAMROM_enable = true;
 
-        aBFFE=0,
+        aBFFE= bBBC ? 3 : 0,
         aBFFF=0,
 
         aAxxxROM = [],
@@ -77,6 +77,17 @@ function fBCxxWrite(nAddr,nVal){
     case 0xbffe:
       if (bRAMROM_enable){
         aBFFE=nVal;
+        if (nVal & 8){
+          bBBC = true;
+          fInitAddr();
+          clearMemory();
+          break;
+        } else {
+          bBBC = false;
+          fInitAddr();
+          clearMemory();
+          break;
+        }
         return aBFFE;
       } else {
         aBFFE=0;
@@ -97,3 +108,4 @@ function fBCxxWrite(nAddr,nVal){
 
   }
 }
+

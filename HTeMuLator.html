@@ -224,6 +224,8 @@ var
 	bLocal  = document.location.href.substr(0, 7).toLowerCase() == "file://",
 	bOnline = !bLocal,
 
+	nFileSystem = 1,	// 0=DOS (not implemented), 1=AtoMMC, 2=SDROM
+
 	bKBEn = true,							// Keyboard enable
 	bBBC = false,							// Enable BBC mode
 	bGreen = false,
@@ -253,6 +255,7 @@ var
 	SYN = 78+(CPUHz / SCRHz)|0,
 	VBL = (SYN * 287.5 / 312.5)|0,
 
+        aFileData = [],
 	HIMEM,									// Top of RAM
 	//MEM = [],								// RAM array
 	// bSpkr = 0,
@@ -261,8 +264,6 @@ var
 	onEvent=(function(a){return function(o,e,f,c){if(!a)a=o.addEventListener?function(o,e,f,c){o.addEventListener(e,f,c)}:o.attachEvent?function(o,e,f,c){o.attachEvent("on"+e,f),c}:function(o,e,f){o["on"+e]=f};a(o,e,f,c)}}()),
 
 	ARGV = new VARG_type(),
-	debug = ARGV.debug * 1,		// Output to debug window on/off
-
 
 	oRSG,
 
@@ -361,6 +362,8 @@ function fBreak()
 	fVIAReset();
 	RST();
 	if(oClock)clearInterval(oClock);oClock=setInterval(f60Hz, Math.floor(1000 / 60));
+        if (nFileSystem == 1){aFileData=aTapes.concat([]);}
+        if (nFileSystem == 2){aFileData=aDisks.concat([]);}
 }
 
 function fRun()
@@ -483,6 +486,14 @@ function fTapeRead(sName, sTape)
 {
 	var
 		i = 0,
+		aCat = [i];
+
+	sName = sName || "";
+	aCat [i = 0] = {n: sName, d: sTape.substr(i,sTape.length)};
+	return aCat;
+/*
+	var
+		i = 0,
 		n,
 		s,
 		e,
@@ -505,6 +516,7 @@ function fTapeRead(sName, sTape)
 	}
 	aCat [i = 0] = {n: sName, s: i, e: i, l: f, f: 0, d: ""};
 	return aCat;
+*/
 }
 
 function fDiskRead(sName, sDisk)
@@ -583,7 +595,7 @@ function fSetDemo(s)
 function fStartUp()
 {
 	if (ARGV.debug) fToggleDebug();
-	screenfull.toggle(document.getElementById('body'));
+//	screenfull.toggle(document.getElementById('body'));
 	// document.getElementById("bFull").click();
 	fInitAddr();
 	clearMemory();
@@ -622,6 +634,7 @@ onEvent(window, "load", fStartUp);
 
 			// -->
 		</script>
+
 		<script type = "text/javascript" language = "JavaScript" src = "./m6502.js"></script>
 		<script type = "text/javascript" language = "JavaScript" src = "./6522_VIA.js"></script>
 		<script type = "text/javascript" language = "JavaScript" src = "./mem.js"></script>
@@ -635,7 +648,13 @@ onEvent(window, "load", fStartUp);
 		<script type = "text/javascript" language = "JavaScript" src = "./BCxx.js"></script>
 		<script type = "text/javascript" language = "JavaScript" src = "./error.js"></script>
 		<script type = "text/javascript" language = "JavaScript" src = "./archive.js"></script>
+		<script type = "text/javascript" language = "JavaScript" src = "./files.js"></script>
 		<script type = "text/javascript" language = "JavaScript" src = "./bran.js"></script>
+//                <script>
+//                   if (nFileSystem == 1){aFileData=aTapes.concat([]);}
+//                   if (nFileSystem == 2){aFileData=aDisks.concat([]);}
+//                </script>
+
 	</head>
 	<body class = "cBlock">
 		<div id = "dManual" class = "cBlock"></div>

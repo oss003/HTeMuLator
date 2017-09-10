@@ -6,11 +6,17 @@
 ;
 ;            BBC mode           Atom mode
 ; -------------------------------------------------------
-; RAM     0x0000 - 0x3FFF    0x0000 - 0x7FFF
-; VIDEO   0x4000 - 0x57FF    0x8000 - 0x97FF
-; Unused  0x6000 - 0x6FFF    0x9800 - 0xAFFF
-; PPIA    0x7000 - 0x7FFF    0xB000 - 0xBFFF
-; ROM     0x8000 - 0xFFFF    0xC000 - 0xFFFF
+; RAM     0x0000 - 0x5FFF    0x0000 - 0x7FFF
+; EXT1    0x6000 - 0x6FFF
+; EXT2    0x7000 - 0x7FFF
+; VIDEO   0x8000 - 0x97FF    0x8000 - 0x97FF
+; Unused  0x9800 - 0x9FFF    0x9800 - 0x9FFF
+; UTIL                       0xA000 - 0xAFFF
+; IO      0xB000 - 0xBFFF    0xB000 - 0xBFFF
+; BASIC   0xC000 - 0xEFFF    0xC000 - 0xCFFF
+; FP                         0xD000 - 0xDFFF
+; DOS                        0xE000 - 0xEFFF
+; MOS     0xF000 - 0xFFFF    0xF000 - 0xFFFF
 ; -------------------------------------------------------
 ;
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -18,9 +24,9 @@
 function fInitAddr()
 {
          if (bBBC) {
-                  HIMEM       = 0x4000;
-                  PPIA_ADDR   = 0x7000;
-                  ROM         = 0x8000;
+                  HIMEM       = 0x6000;
+                  PPIA_ADDR   = 0xB000;
+                  ROM         = 0xA000;
                   LDB         = LDBB;
                   STB         = STBB; }
          else {
@@ -98,7 +104,13 @@ function fIOR(a,A)
 
 function fIOW(a,v)
 {
-         (A=(a>>10)&3)?A-1?A-2?fBCxxWrite(a,v):fVIAWrite(a,v):fMMCWrite(a,v):fPIAW(a&15,v)
+         if (a>=0xB000 && a<=0xB003){return fPIAW(a&15,v)}                          // PIA
+         if (a>=0xB400 && a<=0xB403){return fMMCWrite(a,v)}                         // ATOMMC
+         if (a>=0xB800 && a<=0xB80F){return fVIAWrite(a,v)}                         // VIA
+         if (a>=0xBffe){return fBCxxWrite(a,v)}                                     // BFFE
+         if (a>=0xBfff){return fBCxxWrite(a,v)}                                     // BFFF
+
+//         (A=(a>>10)&3)?A-1?A-2?fBCxxWrite(a,v):fVIAWrite(a,v):fMMCWrite(a,v):fPIAW(a&15,v)
 }
 
 function fSpeaker(bOn){/* Sound not yet implemented */}
@@ -120,7 +132,7 @@ function STBA(a,v)
 
 function LDBA(a,A)
 {
-         if((A=a>>12)<10)return MEM[a];                                      // 0x0000-0x6FFF
+         if((A=a>>12)<10)return MEM[a];                                      // 0x0000-0x9FFF
          switch(A) {
                   case 10: if (aBFFE & 0x01){                                // 0xAxxx
                              return MEM[a-0x3000];
@@ -139,9 +151,12 @@ function LDBA(a,A)
                              return sAFloat_IC21.charCodeAt(a-0xd000);
                            }
                   case 14: if (bAtoMMC_enable){                              // 0xExxx
-//                             return sDOSROM_U15.charCodeAt(a-0xe000);
-//                             return sMMC297E_ROM.charCodeAt(a-0xe000);
-                             return sSDROMe_ROM.charCodeAt(a-0xe000);
+                             if (nFileSystem == 0){
+                               return sDOSROM_U15.charCodeAt(a-0xe000);}
+                             if (nFileSystem == 1){
+                               return sMMC297E_ROM.charCodeAt(a-0xe000);}
+                             if (nFileSystem == 2){
+                             return sSDROMe_ROM.charCodeAt(a-0xe000);}
                            } else {
                              return a>>8;
                            }
@@ -159,19 +174,50 @@ function LDBA(a,A)
 
 function STBB(a,v)
 {
-         return(s=a>>12)<6?(MEM[a]=v,                                                               // 0x0000-0x5FFF
-                  (a-=HIMEM)>=0&&a<nLen?fP(a,v):0):                                             // ???
-                  s>6&&s<8?fIOW(a,v&0xff):0;                                                               // 0x6000-0x7FFF
+	var A=a>>12;
+	if (A<6) return MEM[a]=v;					      // 0x0000-0x5FFF
+	switch(A){
+		case  6:        return aBFFE & 0x01 ? MEM[a]=v : 0;           // 0x6xxx
+                case  7:        return aBFFE & 0x02 ? MEM[a]=v : 0;           // 0x7xxx
+                case  8:case 9:	return fP(a-0x8000,MEM[a]=v);                 // 0x8xxx-0x9FFF
+		case 11:
+	return fIOW(a,v&0xff)			      // 0xBxxx
+	}
+
+//         return(s=a>>12)<6?(MEM[a]=v,(a-=HIMEM)>=0&&a<nLen?fP(a,v):0):      // ???
+//                  s>6&&s<8?fIOW(a,v&0xff):0;                                                               // 0x6000-0x7FFF
 }
 
 function LDBB(a)
 {
-         return(s=a>>12)<6?MEM[a]:                                                                        // 0x0000-0x5FFF
-         s<7?0:                                                                                                                     // 0x6000-0x6FFF
-         s<8?fIOR(a)&255:                                                                                          // 0x7000-0x7FFF
-         s<12?sBASIC1_ROM.charCodeAt(a-32768):                                             // 0x8000-0xBFFF
-         s<15?0:                                                                                                                     // 0xC000-0xEFFF
-         sATOM_BBC_BASIC_OS_ROM.charCodeAt(a-61440);                                    // 0xF000-0xFFFF
+         if((A=a>>12)<6)return MEM[a];                                        // 0x0000-0x5FFF
+         switch(A) {
+                  case 6: if (aBFFE & 0x01){                                  // 0x6xxx
+                             return MEM[a];
+                           } else {
+                             return sBBCEXT1_ROM.charCodeAt(a-0x6000);
+                           }
+                  case 7: if (aBFFE & 0x02){                                  // 0x7xxx
+                             return MEM[a];
+                           } else {
+                             return sBBCEXT2_ROM.charCodeAt(a-0x7000);
+                           }
+                  case 8:case 9: return MEM[a];                               // 0x8xxx-0x9FFF
+                  case 10: return sBASIC1_ROM.charCodeAt(a-0xa000);           // 0xAxxx
+                  case 11: return fIOR(a)&0xff;                               // 0xBxxx
+                  case 12: return sBASIC1_ROM.charCodeAt(a-0xb000);           // 0xCxxx
+                  case 13: return sBASIC1_ROM.charCodeAt(a-0xb000);           // 0xDxxx
+                  case 14: return sBASIC1_ROM.charCodeAt(a-0xb000);           // 0xExxx
+                  case 15: return sATOM_BBC_BASIC_OS_ROM.charCodeAt(a-0xf000);// 0xFxxx                             // 0xFxxx
+         }
+
+
+//         return(s=a>>12)<6?MEM[a]:                                                                        // 0x0000-0x5FFF
+//         s<7?0:                                                                                                                     // 0x6000-0x6FFF
+//         s<8?fIOR(a)&255:                                                                                          // 0x7000-0x7FFF
+//         s<12?sBASIC1_ROM.charCodeAt(a-32768):                                             // 0x8000-0xBFFF
+//         s<15?0:                                                                                                                     // 0xC000-0xEFFF
+//         sATOM_BBC_BASIC_OS_ROM.charCodeAt(a-61440);                                    // 0xF000-0xFFFF
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
