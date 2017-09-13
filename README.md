@@ -1,7 +1,7 @@
 # HTeMuLator
 HTML Acorn Atom emulator
 
-INDEX.HTML starts HTeMuLator
+INDEX.HTML starts HTeMuLator and may have following parameters:
 * disk0=<diskimage>   Load diskimage into drive 0
 * disk0=<diskimage>   Load diskimage into drive 1
 * disk0=<diskimage>   Load diskimage into drive 2
