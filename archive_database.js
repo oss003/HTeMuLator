@@ -2,7 +2,7 @@
 var
 aImages =
 [
-	[-1,"not_found"],
+	[-1,"no_image_available"],
 	[1, "cylon_attack"],
 	[1, "cylon_attack_1"],
 	[2, "death_satellite"],
