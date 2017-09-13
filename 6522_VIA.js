@@ -139,7 +139,9 @@ function fVIAWrite(nAddr, nVal)
 		case _T2CH:	if ((oVia.nT2C == -3 && (oVia.nIER & nTimer2Int)) || (oVia.nIFR & oVia.nIER & nTimer2Int)) nInterrupt |= 128;
 					oVia.nT2L = (oVia.nT2L & 0xff) | nVal << 8; oVia.nT2C = oVia.nT2L + 1;
 					oVia.nIFR &= ~nTimer2Int; fVIAIFRUpdate(); return oVia.nT2Hit = 0;
-		case _IER:	if (nVal & 0x80) oVia.nIER |= nVal & 0x7f; else oVia.nIER &= ~(nVal & 0x7f); return fVIAIFRUpdate();
+		case _IER:	if (nVal & 0x80)
+					 oVia.nIER |= nVal & 0x7f; 
+				else oVia.nIER &= ~(nVal & 0x7f); return fVIAIFRUpdate();
 		case _IFR:	oVia.nIFR &= ~(nVal & 0x7f); fVIAIFRUpdate(); }
 }
 

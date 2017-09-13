@@ -56,6 +56,7 @@ function fBCxxRead(nAddr){
       return bRAMROM_enable ? aBFFF : a>>8;
 
     default:
+      return a>>8;
 //     tMessage ("Read " + nAddr.toString(16) + " PC:" + PCR.toString(16));
 
   }
@@ -82,7 +83,7 @@ function fBCxxWrite(nAddr,nVal){
           fInitAddr();
           clearMemory();
           break;
-        } else {
+        } else if (bBBC == true){
           bBBC = false;
           fInitAddr();
           clearMemory();

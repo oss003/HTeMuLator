@@ -224,7 +224,8 @@ var
 	bLocal  = document.location.href.substr(0, 7).toLowerCase() == "file://",
 	bOnline = !bLocal,
 
-	nFileSystem = 1,	// 0=DOS (not implemented), 1=AtoMMC, 2=SDROM
+	nFileSystem = 2,	// 0=DOS (not implemented), 1=AtoMMC, 2=SDROM
+	InitialStart = true,	// Check for one time autoboot at BREAK
 
 	bKBEn = true,							// Keyboard enable
 	bBBC = false,							// Enable BBC mode
@@ -359,6 +360,14 @@ function f60Hz()
 
 function fBreak()
 {
+	if (InitialStart == true){
+	  InitialStart = false;
+	} else {
+	  configByte = 0xff;
+	}
+	if (this.autoboot==2){
+	  sSDROMe_ROM = sSDROMe_ROM.substr(0,0x72)+"*!BOOT"+sSDROMe_ROM.substr(0x72+6);
+	}
 	fVIAReset();
 	RST();
 	if(oClock)clearInterval(oClock);oClock=setInterval(f60Hz, Math.floor(1000 / 60));
@@ -650,11 +659,12 @@ onEvent(window, "load", fStartUp);
 		<script type = "text/javascript" language = "JavaScript" src = "./archive.js"></script>
 		<script type = "text/javascript" language = "JavaScript" src = "./files.js"></script>
 		<script type = "text/javascript" language = "JavaScript" src = "./bran.js"></script>
-//                <script>
-//                   if (nFileSystem == 1){aFileData=aTapes.concat([]);}
-//                   if (nFileSystem == 2){aFileData=aDisks.concat([]);}
-//                </script>
-
+<!--
+		<script>
+			if (nFileSystem == 1){aFileData=aTapes.concat([]);}
+			if (nFileSystem == 2){aFileData=aDisks.concat([]);}
+		</script>
+-->
 	</head>
 	<body class = "cBlock">
 		<div id = "dManual" class = "cBlock"></div>

@@ -69,12 +69,12 @@ FLR	= 0x20;					// Reserved FLag		(Not Used)
 FLV	= 0x40;					// oVerflow FLag					-> v
 FLN	= 0x80;					// Negative FLag					-> n
 
-F_C	= BYT - FLC;			// Not Carry Flag		(~FLC)		-> C
-F_Z	= BYT - FLZ;			// Not Zero Flag		(~FLZ)		-> Z
+F_C	= BYT - FLC;			// Not Carry Flag	(~FLC)		-> C
+F_Z	= BYT - FLZ;			// Not Zero Flag	(~FLZ)		-> Z
 F_I	= BYT - FLI;			// Not Interrupt Flag	(~FLI)		-> I not used anywhere so free up variable I for Instruction
-F_D	= BYT - FLD;			// Not Decimal Flag		(~FLD)		-> D not used anywhere so free up variable D
-F_B	= BYT - FLB;			// Not Break Flag		(~FLB)		-> B not used anywhere so free up variable B for Byte
-							// Reserved FLag		(Not Used)
+F_D	= BYT - FLD;			// Not Decimal Flag	(~FLD)		-> D not used anywhere so free up variable D
+F_B	= BYT - FLB;			// Not Break Flag	(~FLB)		-> B not used anywhere so free up variable B for Byte
+					// Reserved FLag	(Not Used)
 F_V	= BYT - FLV;			// Not oVerflow Flag	(~FLV)		-> V
 F_N	= BYT - FLN;			// Not Negative Flag	(~FLN)		-> N
 
@@ -131,9 +131,9 @@ ABY	= function(){return BIR=((AIR=ABS())+YIR)&WRD,(EXC&&AIR&MSB!=BIR&MSB?++CLK:N
 
 // Stack Operations
 
-PHB	= function(AIR){MEM[STK|SPR]=AIR;SPR=--SPR&BYT}			// PusH Byte - Uses MEM directly for speed
-PHW	= function(AIR){PHB(AIR>>FLD);PHB(AIR&BYT)}				// PusH Word - Calls PusH Byte twice
-PLB	= function(){return MEM[STK|(SPR=++SPR&BYT)]}			// PulL Byte - Uses MEM directly for speed
+PHB	= function(AIR){MEM[STK|SPR]=AIR;SPR=--SPR&BYT}	// PusH Byte - Uses MEM directly for speed
+PHW	= function(AIR){PHB(AIR>>FLD);PHB(AIR&BYT)}	// PusH Word - Calls PusH Byte twice
+PLB	= function(){return MEM[STK|(SPR=++SPR&BYT)]}	// PulL Byte - Uses MEM directly for speed
 PLW	= function(){return PLB()|PLB()<<FLD}					// PulL Word - Calls PulL Byte twice
 
 // PLB	= function(){return MEM[STK|(SPR=++SPR&BYT)]||NUL}	// PulL Byte - Uses MEM directly for speed
@@ -271,7 +271,8 @@ NOP	= function(){}
 
 // Illegal Instructions
 
-N0P	= function(){fLog("Invalid OP code for "+NME + " AT#" + PCR.toString(16));PCR++} // Note '0' (Zero) in N0P not capital letter 'O' ;-)
+//N0P	= function(){fLog("Invalid OP code #" +  HEX(OPC) + " for " + NME + " at $" + fHexWord(PCR));PCR++} // Note '0' (Zero) in N0P not capital letter 'O' 
+N0P	= function(){}
 
 // Instruction Codes Table - 256 OpCodes; 151 Instructions (105 unused); 56 Operations
 
@@ -344,7 +345,14 @@ INS =	// INStructions		-> I
 /* 3D AND Absolute,X	3 4 *	% ~ 1 ~ ~ ~ % ~ */	function(){AND(ABX)},
 /* 3E ROL Absolute,X	3 7		% ~ 1 ~ ~ ~ % % */	function(){ROL(ABX)},
 /* 3F *** INVALID		1 2		~ ~ 1 ~ ~ ~ ~ ~ */	N0P,
-/* 40 RTI Implied		1 6		% % 1 ~ % % % % */	function(){FLG=PLB()|FLR|FLB;FLG&FLD?(ADD=DAD,SUB=DSB):(ADD=BAD,SUB=BSB);PCR=PLW()},	// function(){FLG=PLB();PCR=PLW()},
+
+/* 40 RTI Implied		1 6		% % 1 ~ % % % % */	function(){
+	FLG=PLB()|FLR|FLB;
+	FLG&FLD?(ADD=DAD,SUB=DSB):(ADD=BAD,SUB=BSB);
+	PCR=PLW()
+},	// function(){FLG=PLB();PCR=PLW()},
+///* 40 RTI Implied		1 6		% % 1 ~ % % % % */	function(){FLG=PLB();PCR=PLW()},	// function(){FLG=PLB();PCR=PLW()},
+
 /* 41 EOR (Indirect,X)	2 6		% ~ 1 ~ ~ ~ % ~ */	function(){EOR(XID)},
 /* 42 *** INVALID		1 2		~ ~ 1 ~ ~ ~ ~ ~ */	N0P,
 /* 43 *** INVALID		1 2		~ ~ 1 ~ ~ ~ ~ ~ */	N0P,
@@ -552,7 +560,15 @@ EXE	= function(){INS[OPC]();CLK+=TIK[OPC]}	// EXE = EXEcute
 FDE	= function(){FCH();DCD();EXE()}			// FDE = Fetch, Decode, Execute cycle
 STP	= function(NIN){while(NIN-->0)FDE()}	// STP = STeP (No. of Instructions)
 RUN	= function(NCY){OPC=IMB();PCR&=WRD;EXC=TOK[OPC];INS[OPC]();CLK+=TIK[OPC];PCR-ERV?NUL:fHelpWin(LDB(NUL),IMW(FLC))}	//  RUN = RUN (No. of cycles)
-RUN = function(){OPC=IMB();PCR&=WRD;CYC=CLK;EXC=TOK[OPC];INS[OPC]();CLK+=TIK[OPC];fIOPoll(CLK-CYC);PCR-ERV?NUL:fHelpWin(LDB(NUL),IMW(FLC))}	//  RUN = RUN (No. of cycles)
+RUN	= function(){OPC=IMB();PCR&=WRD;CYC=CLK;EXC=TOK[OPC];INS[OPC]();CLK+=TIK[OPC];fIOPoll(CLK-CYC);if(nInterrupt)fHandleInt();}	//  RUN = RUN (No. of cycles)
+
+function fHandleInt(){
+	FLG &= F_I &= F_B;
+	nInterrupt = 0;
+	PHW(PCR&WRD);
+	PHB(FLG);
+	PCR=IMW(IRV)
+}
 
 RST	= function()							// RST = ReSeT
 {
@@ -612,95 +628,3 @@ INIT	= function(){BLD();RST()}
 // The fLog function can be deleted for compacting if logging is disabled (LOG = false)
 
 fLog	= function(s){if(LOG)alert(s)}
-
-/*
-TODO:
-
-void ADC(temp)
-{
-	if (!p.d) {
-		tempw = a + temp + (p.c ? 1 : 0);
-		p.v = !((a ^ temp) & 0x80) && ((a ^ tempw) & 0x80);
-		a = tempw & 0xFF;
-		p.c = tempw & 0x0100;
-		setzn(a); }
-	else {
-		ah = 0;
-		p.z = p.n = 0;
-		tempb = a + temp + (p.c ? 1 : 0);
-		if (!tempb) p.z = 1;
-		al = (a & 0x0F) + (temp & 0x0F) + (p.c ? 1 : 0);
-		if (al > 9) {
-			al -= 10;
-			al &= 0x0F;
-			ah = 1; }
-		ah += (a >> 4) + (temp >> 4);
-		if (ah & 0x08) p.n = 1;
-		p.v = (((ah << 4) ^ a) & 0x80) && !((a ^ temp) & 0x80);
-		p.c = 0;
-		if (ah > 9) {
-			p.c = 1;
-			ah -= 10;
-			ah &= 0x0F; }
-		a = (al & 0x0F) | (ah << 4); }
-}
-
-DAD	= function(AIR){
-var ah=0,al,tb=ACC+AIR+(FLG&FLC);
-FLG&=F_N&F_V&F_Z;
-if(!tb)FLG|=FLZ;
-al=(ACC&0x0F)+(AIR&0x0F)+(FLG&FLC);
-if(al>9){al-=10;al&=0x0F;ah=1}
-ah+=(ACC>>4)+(AIR>>4);
-if(ah&0x08)FLG|=FLN;
-if((((ah<<4)^ACC)&0x80)&&!((ACC^AIR)&0x80))FLG|=FLV;
-FLG&=F_C;
-if(ah>9){FLG|=FLC;ah-=10;ah&=0x0F}
-ACC=(al&0x0F)|(ah<<4)}
-
-void SBC(temp)
-{
-	if (!p.d) {
-		tempw = a - (temp + (p.c ? 0 : 1));
-		tempv = (int16_t)a - (int16_t)(temp + (p.c ? 0 : 1));
-		p.v = ((a ^ temp) & 0x80) && ((a ^ tempw) & 0x80);
-		p.c = tempv >= 0;
-		a = tempw & 0xFF;
-		setzn(a); }
-	else {
-		hc = 0;
-		p.z = p.n = 0;
-		tempb = a - temp - (p.c ? 0 : 1);
-		if (!(tempb)) p.z = 1;
-		al = (a & 0x0F) - (temp & 0x0F) - (p.c ? 0 : 1);
-		if (al & 0x10) {
-			al -= 6;
-			al &= 0x0F;
-			hc = 1; }
-		ah = (a >> 4) - (temp >> 4);
-		if (hc) ah--;
-		if ((a - (temp + ((p.c) ? 0 : 1))) & 0x80) p.n = 1;
-		p.v = ((a ^ temp) & 0x80) && ((a ^ tempb) & 0x80);
-		p.c = 1;
-		if (ah & 0x10) {
-			p.c = 0;
-			ah -= 6;
-			ah &= 0x0F; }
-		a = (al & 0x0F) | ((ah & 0x0F) << 4); }
-}
-
-DSB	= function(AIR){
-var ah,al,hc=0,c=FLG&FLC?0:1,tb=ACC-AIR-c;
-FLG&=F_N&F_V&F_Z;
-if(!tb)FLG|=FLZ;
-al=(ACC&0x0F)-(AIR&0x0F)-c;
-if(al&0x10){al-=6;al&=0x0F;hc=1}
-ah=(ACC>>4)-(AIR>>4);
-if(hc)ah--;
-if((ACC-(AIR+c))&0x80)FLG|=FLN;
-if(((ACC^AIR)&0x80)&&((ACC^tb)&0x80))FLG|=FLV;
-FLG|=FLC;
-if(ah&0x10){FLG&=F_C;ah-=6;ah&=0x0F}
-ACC=(al&0x0F)|((ah&0x0F)<<4)}
-
-*/
