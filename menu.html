@@ -96,7 +96,7 @@ function fDownload(nDisk)
 	eLink.click();
 	document.body.removeChild(eLink);
 }
-
+ 
 function fWrite(s)
 {
 	document.write(s);
@@ -113,6 +113,7 @@ for (i = 0, r = 0; i < aDisks.length; ++i) {
 		--n; ++r; fWrite("<tr style = 'background-color: #" + (r & 1 ? "444" : "222") + ";'>"); s = fImage(aData [n][0]);
 		fWrite("<td><img src = " + s + " width = 64px onclick = \"fLaunch(" + aData [n][0] + ")\" title = \"" + t + "play this game\"></td>");
 		fWrite("<td><img src = \"./img/download.png\" width = 64px onclick = \"fDownload(" + aData [n][0] + ")\" title = \"" + t + "download this game\"></td>");
+		fWrite("<td>" + aData [n][0] + "</td>");
 		for (c = 0; c < aData [n].length; ++c)
 			if (l.indexOf(String.fromCharCode(65 + c)) >= 0) fWrite("<td>" + aData [n] [c].toUpperCase() + "</td>");
 		fWrite("</tr>"); } }
