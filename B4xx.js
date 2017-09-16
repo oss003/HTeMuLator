@@ -28,7 +28,7 @@ var
 
 	CMD_DIR_OPEN		= 0x00,	// DIR_CMD_REG commands
 	CMD_DIR_READ		= 0x01,
-//	CMD_DIR_CWD		= 0x02,
+	CMD_DIR_CWD		= 0x02,
 
 //	CMD_FILE_CLOSE		= 0x10,	// CMD_REG_COMMANDS
 	CMD_FILE_OPEN_READ	= 0x11,
@@ -91,10 +91,12 @@ var
         heartbeat = 0x55,
 	autoboot = ARGV.autoboot * 1,
 	configByte = (autoboot == 0) ? 0xff : 0,	// Configuration byte AtoMMC
+	nJoyMMC = 0,			// AtoMMC joystick 
 
 // SDROM vars
 	globalCurDrive = 0,		// Current selected Drive
 	sFilter = "",			// Filterstring
+	sDirFilter = "/",		// Directory
 	DirPointer = 0,			// Directory pointer Disk array
 	FilePointer = 0,		// File pointer Tape array
 	BytePointer = 0;                // Pointer within file
@@ -236,34 +238,48 @@ function fMMCWrite(nAddr,nVal){
                 if (DirPointer !== aFileData.length){
                   // get next directory entry
                   //
-                  while (matchRuleShort(aFileData[DirPointer][0].n, sFilter) == false && DirPointer !== aFileData.length-1){
+                  while (matchRuleShort(aFileData[DirPointer][0].n, sFilter) == false ||
+                         matchDir(aFileData[DirPointer][0].p, sDirFilter)    == false &&
+                         DirPointer < aFileData.length-1){ 
                     ++DirPointer;
                   }
-                  if (matchRuleShort(aFileData[DirPointer][0].n, sFilter) == true && DirPointer !== aFileData.length){
-                    for (i = 0; i < aFileData[DirPointer][0].n.length; ++i){
-                      globalData[i+1]=aFileData[DirPointer][0].n[i];
+                  if (DirPointer !== aFileData.length){
+                    if (matchRuleShort(aFileData[DirPointer][0].n, sFilter) && matchDir(aFileData[DirPointer][0].p, sDirFilter)){
+                      for (i = 0; i < aFileData[DirPointer][0].n.length; ++i){
+                        globalData[i+1]=aFileData[DirPointer][0].n[i];
+                      }
+                      globalData[i+1]=0;
+                      ++DirPointer;
+                      WriteDataPort(STATUS_OK);
+                      break;
                     }
-                    globalData[i+1]=0;
-                    if (DirPointer < aFileData.length){++DirPointer};
-                    WriteDataPort(STATUS_OK);
                   } else {
-                    WriteDataPort(STATUS_COMPLETE);
+//                    WriteDataPort(STATUS_COMPLETE);
+//                    break;
                   }
-                  break;
                 } else {
                   // done
                   //
-                  WriteDataPort(STATUS_COMPLETE);
-                  break;
+//                  WriteDataPort(STATUS_COMPLETE);
+//                  break;
                 }
+                WriteDataPort(STATUS_COMPLETE);
+                break;
               }
-
-/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
             case CMD_DIR_CWD:
               // set CWD
               //
-              worker = WFN_SetCWDirectory;
+              if (sDirFilter !== "/")sDirFilter = sDirFilter + "/";
+              for (i = 0; i < globalData.length -1; ++i){
+                if (String.fromCharCode(globalData[i]) !== "/"){
+                  sDirFilter = sDirFilter + String.fromCharCode(globalData[i]);
+                }
+              }
+              WriteDataPort(STATUS_COMPLETE);
+              break;
+
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
           // File group.
 
@@ -551,7 +567,7 @@ function fMMCWrite(nAddr,nVal){
 
             case CMD_READ_PORT:
               // read portb
-              WriteDataPort(0xff);
+              WriteDataPort(nJoyMMC);
               break;
 
             case CMD_SET_CFG_BYTE:
@@ -566,6 +582,7 @@ function fMMCWrite(nAddr,nVal){
               // osrdch call. the psp may not be enabled by that point,
               // so we have to wait till it is.
               //
+              sDirFilter = "/";
               WriteDataPort(heartbeat);
               heartbeat ^= 0xff;
               break;
@@ -632,4 +649,19 @@ function tMessage(sLine){
 
 function matchRuleShort(str, rule){
   return new RegExp("^" + rule.split("*").join(".*") + "$").test(str);
+}
+
+function matchDir(str, rule){
+  switch (nFileSystem){
+    case 0:
+      return true;
+    case 1:
+      if (rule.substring(0,str.length) == rule){
+        return true;
+      } else {
+        return false;
+      }
+   case 2:
+      return true;
+  }
 }

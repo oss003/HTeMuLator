@@ -7,6 +7,7 @@
 		</title>
 
 		<style type = "text/css">
+
 			@font-face
 			{
 				font-family:	"atom_font";
@@ -18,18 +19,21 @@
 				font-weight:	normal;
 				font-style:		normal;
 			}
+
 			body
 			{
 				border:			0px;
 				margin:			0px;
 				padding:		0px;
-				font:			28px atom_font, Tahoma, "Lucida Console", monospace;
+				font:			14px atom_font, Tahoma, "Lucida Console", monospace;
 				color:			white;
 			}
+
 			img
 			{
 				padding:		4px;
 			}
+
 		</style>
 
 	</head>
@@ -37,44 +41,56 @@
 		<table width = "100%" cellpadding = "2" cellspacing = "0">
 			<script type = "text/javascript" language = "JavaScript" src = "./archive_database.js"></script>
 			<script type = "text/javascript">
+
 				<!--
+
 var aDSKs = [], bLocal = document.location.href.substr(0, 7).toLowerCase() == "file://", ARGV = new VARG_type();
+
 function VARG_type()	// VARG (Variable ARGument) defaults
 {
 	this.filter = "";
 }
+
 function VARG_get(o)
 {
 	var js = self.location.search.substring(1);
 	if (js) js = js.replace(/=/g, "=\"") + '"';
 	return js == "" ? 0 : eval(o + '.' + unescape(js.replace(/&/g, "\";" + o + '.')));
 }
+
 function D64(s)
 {
 	return s;
 }
+
 function fDiskRead(sIndex, sContents)
 {
 	aDSKs [sIndex] = sContents;
 }
+
 function fImage(n)
 {
 	for (var i = 0, f = 0; !f && i < aImages.length; ++i) f = aImages [i][0] == n;
 	return "\"./img/" + aImages [f ? i-1 : 0] [1] + ".png\"";
 }
+
 function fLaunch(nDisk)
 {
 	document.location.href = "./" + (bLocal ? "index.html" : "") + "?disk0=" + nDisk + "&autoboot=2";
 }
+
 function fDownload(nDisk)
 {
 	//	data:application/octet-stream;base64,		OR		data:application/binary;base64,
+
 	// This trick will generate a temp <a /> tag, ...
 	var eLink = document.createElement('a');
 	eLink.href = "data:application/octet-stream;base64," + aDSKs [nDisk];
+
 	// ... set the visibility hidden so it will not effect the page layout, ...
 	eLink.style = "visibility: hidden;";
 	eLink.download = "Disk" + nDisk + ".dsk"
+
 	// ... append the anchor tag and remove it after automatic click
 	document.body.appendChild(eLink);
 	eLink.click();
@@ -85,20 +101,54 @@ function fWrite(s)
 {
 	document.write(s);
 }
+
 VARG_get("ARGV");
+
 var c, f, i, l, n, r, s, t;
+
 l = "FGHI"; t = "Click here to "
+
+fWrite("<div class='row' style='display:flex; flex-wrap: wrap; color: #fff; background-color: #ddd;'>");
+
 for (i = 0, r = 0; i < aDisks.length; ++i) {
 	for (f = false, n = 0; !f && n < aData.length; ++n) f = aData [n][0]*1 == aDisks [i];
-	if (f) {
-		--n; ++r; fWrite("<tr style = 'background-color: #" + (r & 1 ? "444" : "222") + ";'>"); s = fImage(aData [n][0]);
-		fWrite("<td><img src = " + s + " width = 256px onclick = \"fLaunch(" + aData [n][0] + ")\" title = \"" + t + "play this game\"></td>");
-		fWrite("<td><img src = \"./img/download.png\" width = 64px onclick = \"fDownload(" + aData [n][0] + ")\" title = \"" + t + "download this game\"></td>");
-		fWrite("<td>" + aData [n][0] + "</td>");
-		for (c = 0; c < aData [n].length; ++c)
-			if (l.indexOf(String.fromCharCode(65 + c)) >= 0) fWrite("<td>" + aData [n] [c].toUpperCase() + "</td>");
-		fWrite("</tr>"); } }
+	if (f){
+		--n; ++r; 
+
+                s = fImage(aData [n][0]);
+		sRecordNr=aData [n][0];
+		sPublisher=aData [n][2];
+		sType=aData [n][5];
+		sTitle=aData [n][6];
+
+		fWrite("<div class='col'>");
+                fWrite("<div class='thumbnail text-center'; style = 'margin: 10px; text-align: center; border:1px solid grey; background-color: #444; width: 220px; padding-top: 10px'>");
+		fWrite("<img src = " + s + " width = 200px>");
+
+                fWrite("<div class='row-title'><a><h2>" + sTitle.toUpperCase() + "            </h2></a></div>");
+                fWrite("<div class='row-pub'>  <a>" + sPublisher.toUpperCase() + "<br></a></div>");
+                fWrite("<div class='row-dt'>   <a>" + sType.toUpperCase() + "              </a></div>");
+
+                fWrite("<p><a>");
+		fWrite("<img src = \"./img/download.png\" onclick = \"fDownload(" + aData [n][0] + ")\" title = \"" + t + "download this game\">");
+		fWrite("<img src = \"./img/play.png\" onclick = \"fLaunch(" + aData [n][0] + ")\" title = \"" + t + "play this game\">");
+		fWrite("<br><br>RECORDNUMBER: " + sRecordNr); 
+                fWrite("</a></p></div></div>");
+
+
+//                fWrite("<tr style = 'background-color: #" + (r & 1 ? "444" : "222") + ";'>"); s = fImage(aData [n][0]);
+//		fWrite("<td><img src = " + s + " width = 128px onclick = \"fLaunch(" + aData [n][0] + ")\" title = \"" + t + "play this game\"></td>");
+//		fWrite("<td><img src = \"./img/download.png\" width = 64px onclick = \"fDownload(" + aData [n][0] + ")\" title = \"" + t + "download this game\"></td>");
+//		fWrite("<td>" + aData [n][0] + "</td>");
+//		for (c = 0; c < aData [n].length; ++c)
+//			if (l.indexOf(String.fromCharCode(65 + c)) >= 0) fWrite("<td>" + aData [n] [c].toUpperCase() + "</td>");
+//		fWrite("</tr>");
+	} 
+	}
+fWrite("</div>");
+
 				// -->
+
 			</script>
 			<script type = "text/javascript" language = "JavaScript" src = "./archive.js"></script>
 		</table>

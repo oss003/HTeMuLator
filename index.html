@@ -491,14 +491,14 @@ function fParseBASIC(sBASIC)
 	return sBASIC;
 }
 
-function fTapeRead(sName, sTape)
+function fTapeRead(sName, sPath, sTape)
 {
 	var
 		i = 0,
 		aCat = [i];
 
 	sName = sName || "";
-	aCat [i = 0] = {n: sName, d: sTape.substr(i,sTape.length)};
+	aCat [i = 0] = {n: sName, p: sPath, d: sTape.substr(i,sTape.length)};
 	return aCat;
 /*
 	var

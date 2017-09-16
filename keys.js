@@ -26,9 +26,20 @@ var
 	sMods,
 	sPCLookUp,
 
+/*
+	K  = PC keycode
+	M  = 
+	A  = Atom
+	RC = 1 byte packed ROW, COL for the Atom Keyboard matrix
+	G  =
+	L  = Label to be used on graphical representation of the keys - ignore
+	U  = Unicode value for HTML of the key - Ignore
+	N  = Full name of the key in human readable form
+*/
+
 	aPCKeys =
 	[
-		//			   K  M  A RC G L               U               N
+		//		K  M  A RC G L               U               N
 		/* 00   0   */"00 00 c0 00 0",
 		/* 01   1   */"10 01 41 81 2 &#x21E7;        &#x21E7;        Left Shift",
 		/* 02   2   */"11 02 42 a1 2                 Ctrl            Left Ctrl",
@@ -213,7 +224,7 @@ var
 		/* 2d  45 - */"5f 31 2d 0c b -               =               - / =",
 		/* 2e  46 . */"3e 2a 2e 6b b .               &gt;            . / &gt;",
 		/* 2f  47 / */"3f 29 2f 6c b /               ?               / / ?",
-		/* 30  48 0 */"30 44 30 0b d 0               0               0",
+		/* 30  48 0 */"30 44 31 0b d 0               0               0",
 		/* 31  49 1 */"31 43 31 02 d 1               !               1 / !",
 		/* 32  50 2 */"32 42 32 03 d 2               &quot;          2 / &quot;",
 		/* 33  51 3 */"33 41 33 04 d 3               #               3 / #",
