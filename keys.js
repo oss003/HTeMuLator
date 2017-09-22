@@ -26,20 +26,9 @@ var
 	sMods,
 	sPCLookUp,
 
-/*
-	K  = PC keycode
-	M  = 
-	A  = Atom
-	RC = 1 byte packed ROW, COL for the Atom Keyboard matrix
-	G  =
-	L  = Label to be used on graphical representation of the keys - ignore
-	U  = Unicode value for HTML of the key - Ignore
-	N  = Full name of the key in human readable form
-*/
-
 	aPCKeys =
 	[
-		//		K  M  A RC G L               U               N
+		//			   K  M  A RC G L               U               N
 		/* 00   0   */"00 00 c0 00 0",
 		/* 01   1   */"10 01 41 81 2 &#x21E7;        &#x21E7;        Left Shift",
 		/* 02   2   */"11 02 42 a1 2                 Ctrl            Left Ctrl",
@@ -211,20 +200,36 @@ var
 		/* 20  32   */"20 5a 20 81 b                                 Space",
 		/* 21  33 ! */"00 00 b1 00 f [Free]                          [PC Shift+1]",
 		/* 22  34 " */"00 00 b2 00 f [Free]                          [PC Shift+2]",
-		/* 23  35 # */"23 c0 b3 00 b 3               #               3 / #",
+
+// PC(') = Atom(:) patch
+//		/* 23  35 # */"23 c0 b3 00 b 3               #               3 / #",
+		/* 23  35 # */"23 34 b4 00 b 4               #               3 / #",
+
 		/* 24  36 $ */"00 00 b4 00 f [Free]                          [PC Shift+4]",
 		/* 25  37 % */"00 00 b5 00 f [Free]                          [PC Shift+5]",
-		/* 26  38 & */"b7 c9 b7 00 b [Atom 6 / &]                    [PC Shift+6]",
+
+// PC(&) = Atom(') patch
+//		/* 26  38 & */"b7 c9 b7 00 b [Atom 6 / &]                    [PC Shift+6]",
+		/* 26  38 & */"b6 c9 b7 00 b [Atom 6 / &]                    [PC Shift+6]",
+
 		/* 27  39 ' */"40 ca 27 00 b 7               '               7 / '",
 		/* 28  40 ( */"b0 cc b9 00 b [Atom 8 / (]                    [PC Shift+8]",
-		/* 29  41 ) */"b9 cb b0 00 b [Atom 9 / )]                    [PC Shift+9]",
+
+// PC(() = Atom()) patch
+//		/* 29  41 ) */"b9 cb b0 00 b [Atom 9 / )]                    [PC Shift+9]",
+		/* 29  41 ) */"b8 cb b0 00 b [Atom 9 / )]                    [PC Shift+9]",
+
 		/* 2a  42 * */"b8 cd b8 00 b :               &lowast;        : / &lowast;",
-		/* 2b  43 + */"bd ce bd 00 b =               +               = / +",
+
+// PC(+) = Atom(INV @) patch
+//		/* 2b  43 + */"bd ce bd 00 b =               +               = / +",
+		/* 2b  43 + */"bd d9 bd 00 b =               +               = / +",
+
 		/* 2c  44 , */"3c 32 2c 6a b ,               &lt;            , / &lt;",
 		/* 2d  45 - */"5f 31 2d 0c b -               =               - / =",
 		/* 2e  46 . */"3e 2a 2e 6b b .               &gt;            . / &gt;",
 		/* 2f  47 / */"3f 29 2f 6c b /               ?               / / ?",
-		/* 30  48 0 */"30 44 31 0b d 0               0               0",
+		/* 30  48 0 */"30 44 30 0b d 0               0               0",
 		/* 31  49 1 */"31 43 31 02 d 1               !               1 / !",
 		/* 32  50 2 */"32 42 32 03 d 2               &quot;          2 / &quot;",
 		/* 33  51 3 */"33 41 33 04 d 3               #               3 / #",
@@ -234,10 +239,18 @@ var
 		/* 37  55 7 */"37 37 37 08 d 7               '               7 / '",
 		/* 38  56 8 */"38 36 38 09 d 8               (               8 / (",
 		/* 39  57 9 */"39 35 39 0a d 9               )               9 / )",
-		/* 3a  58 : */"bb cd bb 0d b :               &lowast         : / &lowast;",
+
+// PC(:) = Atom(+) patch
+//		/* 3a  58 : */"bb cd bb 0d b :               &lowast         : / &lowast;",
+		/* 3a  58 : */"bb ce bb 0d b :               &lowast         : / &lowast;",
+
 		/* 3b  59 ; */"3b 33 3b 4c b ;               +               ; / +",
 		/* 3c  60 < */"00 00 ac 00 f [Free]                          [PC Shift+,]",
-		/* 3d  61 = */"3d d0 3d 00 b -               =               - / =",
+
+// PC(=) = Atom(@) patch
+//		/* 3d  61 = */"3d d0 3d 00 b -               =               - / =",
+		/* 3d  61 = */"3d 28 b3 00 b -               =               - / =",
+
 		/* 3e  62 > */"00 00 ae 00 f [Free]                          [PC Shift+.]",
 		/* 3f  63 ? */"5e d9 af 00 b @               @               @ / `",
 		/* 40  64 @ */"c0 d9 a7 2d b @               @               @ / `",
@@ -496,12 +509,18 @@ function fATOMPress(nKey)
 		D=nKey&0x800?1:0;
 
 	// R = Row, C = InKey Minus Code / Column
+
 	if(C==INVALID)return;
+
 	C=N=aATOMKeys[C].M-1;N=S?~N:N;
+
 	if(C&0x80){S=1;C=255-C;}
 	C=(R=C&15,C>>=4)?5-C%7:R-2?R^7:8
+
 	if(R==9&&C==14)return fBreak();
+
 	if(S)D?(aKeys[0]&=0x7f):(aKeys[0]|=0x80);
+
 	if(R==1&&C==6)D?(aKeys[0]&=0xbf):(aKeys[0]|=0x40);
 	B<<=C;if(D)aKeys[R]&=255-B;else aKeys[R]|=B;
 }

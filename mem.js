@@ -97,9 +97,10 @@ function fIOR(a,A)
          if (a>=0xB400 && a<=0xB403){return fMMCRead(a)}                         // ATOMMC
          if (a>=0xB410 && a<=0xB6ac){return sBRAN_B410[a-0xB410].charCodeAt(0)}  // BRAN2
          if (a>=0xB800 && a<=0xB80F){return fVIARead(a)}                         // VIA
+         if (a>=0xBDE8 && a<=0xBDEA){return fBCxxRead(a)}                        // Mouse
          if (a>=0xBffe){return fBCxxRead(a)}                                     // BFFE
          if (a>=0xBfff){return fBCxxRead(a)}                                     // BFFF
-        return a>>8
+        return 0xbf
 }
 
 function fIOW(a,v)
@@ -107,10 +108,9 @@ function fIOW(a,v)
          if (a>=0xB000 && a<=0xB003){return fPIAW(a&15,v)}                          // PIA
          if (a>=0xB400 && a<=0xB403){return fMMCWrite(a,v)}                         // ATOMMC
          if (a>=0xB800 && a<=0xB80F){return fVIAWrite(a,v)}                         // VIA
+         if (a>=0xBDE8 && a<=0xBDEA){return fBCxxWrite(a,v)}                        // Mouse
          if (a>=0xBffe){return fBCxxWrite(a,v)}                                     // BFFE
          if (a>=0xBfff){return fBCxxWrite(a,v)}                                     // BFFF
-
-//         (A=(a>>10)&3)?A-1?A-2?fBCxxWrite(a,v):fVIAWrite(a,v):fMMCWrite(a,v):fPIAW(a&15,v)
 }
 
 function fSpeaker(bOn){/* Sound not yet implemented */}
@@ -180,12 +180,8 @@ function STBB(a,v)
 		case  6:        return aBFFE & 0x01 ? MEM[a]=v : 0;           // 0x6xxx
                 case  7:        return aBFFE & 0x02 ? MEM[a]=v : 0;           // 0x7xxx
                 case  8:case 9:	return fP(a-0x8000,MEM[a]=v);                 // 0x8xxx-0x9FFF
-		case 11:
-	return fIOW(a,v&0xff)			      // 0xBxxx
+		case 11:	return fIOW(a,v&0xff)			      // 0xBxxx
 	}
-
-//         return(s=a>>12)<6?(MEM[a]=v,(a-=HIMEM)>=0&&a<nLen?fP(a,v):0):      // ???
-//                  s>6&&s<8?fIOW(a,v&0xff):0;                                                               // 0x6000-0x7FFF
 }
 
 function LDBB(a)
@@ -210,14 +206,6 @@ function LDBB(a)
                   case 14: return sBASIC1_ROM.charCodeAt(a-0xb000);           // 0xExxx
                   case 15: return sATOM_BBC_BASIC_OS_ROM.charCodeAt(a-0xf000);// 0xFxxx                             // 0xFxxx
          }
-
-
-//         return(s=a>>12)<6?MEM[a]:                                                                        // 0x0000-0x5FFF
-//         s<7?0:                                                                                                                     // 0x6000-0x6FFF
-//         s<8?fIOR(a)&255:                                                                                          // 0x7000-0x7FFF
-//         s<12?sBASIC1_ROM.charCodeAt(a-32768):                                             // 0x8000-0xBFFF
-//         s<15?0:                                                                                                                     // 0xC000-0xEFFF
-//         sATOM_BBC_BASIC_OS_ROM.charCodeAt(a-61440);                                    // 0xF000-0xFFFF
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

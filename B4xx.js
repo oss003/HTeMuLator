@@ -60,7 +60,7 @@ var
 //	CMD_GET_PORT_DDR	= 0xA0,
 	CMD_SET_PORT_DDR	= 0xA1,
 	CMD_READ_PORT		= 0xA2,
-//	CMD_WRITE_PORT		= 0xA3,
+	CMD_WRITE_PORT		= 0xA3,
 	CMD_GET_FW_VER		= 0xE0,
 	CMD_GET_BL_VER		= 0xE1,
 	CMD_GET_CFG_BYTE	= 0xF0,
@@ -91,7 +91,7 @@ var
         heartbeat = 0x55,
 	autoboot = ARGV.autoboot * 1,
 	configByte = (autoboot == 0) ? 0xff : 0,	// Configuration byte AtoMMC
-	nJoyMMC = 0,			// AtoMMC joystick 
+	nJoyMMC = 0xff,			// AtoMMC joystick 
 
 // SDROM vars
 	globalCurDrive = 0,		// Current selected Drive
@@ -126,6 +126,7 @@ function Struct(val1,name, val2)	// Structure for driveinfo table
 ;
 ; Read AtoMMC register nAddr
 ;  #B400 - CMD_REG, Set command
+;  #B401 - READ_PORTB
 ;  #B402 - READ_DATA_REG, Read result from buffer
 ;  #B403 - LATCH_REG, Data latch register
 ;
@@ -142,6 +143,10 @@ function fMMCRead(nAddr){
 
       case CMD_REG:
         Ret = LATD;
+        break;
+
+      case LATCH_REG:
+        Ret = 0;
         break;
 
       case READ_DATA_REG:
@@ -253,15 +258,7 @@ function fMMCWrite(nAddr,nVal){
                       WriteDataPort(STATUS_OK);
                       break;
                     }
-                  } else {
-//                    WriteDataPort(STATUS_COMPLETE);
-//                    break;
                   }
-                } else {
-                  // done
-                  //
-//                  WriteDataPort(STATUS_COMPLETE);
-//                  break;
                 }
                 WriteDataPort(STATUS_COMPLETE);
                 break;
@@ -568,6 +565,12 @@ function fMMCWrite(nAddr,nVal){
             case CMD_READ_PORT:
               // read portb
               WriteDataPort(nJoyMMC);
+              break;
+
+            case CMD_WRITE_PORT:
+              // write portb
+              nJoyMMC = nVal;
+              WriteDataPort(STATUS_OK);
               break;
 
             case CMD_SET_CFG_BYTE:

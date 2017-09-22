@@ -560,14 +560,15 @@ EXE	= function(){INS[OPC]();CLK+=TIK[OPC]}	// EXE = EXEcute
 FDE	= function(){FCH();DCD();EXE()}			// FDE = Fetch, Decode, Execute cycle
 STP	= function(NIN){while(NIN-->0)FDE()}	// STP = STeP (No. of Instructions)
 RUN	= function(NCY){OPC=IMB();PCR&=WRD;EXC=TOK[OPC];INS[OPC]();CLK+=TIK[OPC];PCR-ERV?NUL:fHelpWin(LDB(NUL),IMW(FLC))}	//  RUN = RUN (No. of cycles)
-RUN	= function(){OPC=IMB();PCR&=WRD;CYC=CLK;EXC=TOK[OPC];INS[OPC]();CLK+=TIK[OPC];fIOPoll(CLK-CYC);if(nInterrupt)fHandleInt();}	//  RUN = RUN (No. of cycles)
+RUN	= function(){OPC=IMB();PCR&=WRD;CYC=CLK;EXC=TOK[OPC];INS[OPC]();CLK+=TIK[OPC];fIOPoll(CLK-CYC);if(nInterrupt  && !(FLG & FLI))fHandleInt();}	//  RUN = RUN (No. of cycles)
 
 function fHandleInt(){
-	FLG &= F_I &= F_B;
+	FLG &= F_B;
 	nInterrupt = 0;
 	PHW(PCR&WRD);
 	PHB(FLG);
 	PCR=IMW(IRV)
+	SET(FLI);
 }
 
 RST	= function()							// RST = ReSeT

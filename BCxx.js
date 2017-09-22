@@ -3,7 +3,24 @@
 ; BCxx.js, IO addresses #BC00-#BFFF                     KC 2017
 ;--------------------------------------------------------------
 ;
-; RAMROM emulation at #BFFE/F
+; Mouse emulation:
+;    #BDE8 - X-pos mouse pointer (0-255)
+;    #BDE9 - Y-pos mouse (0-255, 255 = top)
+;    #BDEA -  mouse control
+;
+;        Write #BDEA:
+;          - b7    = dis-/enable mouse pointer (0=disable)
+;          - b5-6 = not used
+;          - b0-4 = mouse pointer selector
+;
+;        Read #BDEA:
+;          - b7    = dis-/enable mouse pointer (0=disable)
+;          - b3-6 = not used
+;          - b2    = right button (0=pressed)
+;          - b1    = middle button (0=pressed)
+;          - b0    = left button (0=pressed)
+;
+; RAMROM emulation:
 ;    #BFFE - Status register RAMROM board
 ;    #BFFF - Switch byte util roms at #Axxx
 ;
@@ -17,9 +34,9 @@
 ;
 */
 
-var
-// Dis-/enable hardware emulation for devices
-        bRAMROM_enable = true;
+// RAMROM variables
+
+var     bRAMROM_enable = true,
 
         aBFFE= bBBC ? 3 : 0,
         aBFFF=0,
@@ -36,6 +53,13 @@ var
         aUtilRoms[6] = sFPGA_UTILS_ROM;
         aUtilRoms[7] = sSDROM_ROM;
 
+// Mouse variables
+
+var	nBDE8 = 0,	// X-pos mouse
+	nBDE9 = 0,	// Y-pos mouse
+	nBDEA = 0;	// Mouse control
+	nBDEAw = 0x80;	// Mouse pointer
+
 /*
 ;--------------------------------------------------------------
 ;
@@ -49,15 +73,20 @@ var
 function fBCxxRead(nAddr){
   switch (a = nAddr){
 
+    case 0xbde8:
+      return nBDE8;
+
+    case 0xbde9:
+      return nBDE9;
+
+    case 0xbdea:
+      return nBDEAw;
+
     case 0xbffe:
       return bRAMROM_enable ? aBFFE : a>>8;
 
     case 0xbfff:
       return bRAMROM_enable ? aBFFF : a>>8;
-
-    default:
-      return a>>8;
-//     tMessage ("Read " + nAddr.toString(16) + " PC:" + PCR.toString(16));
 
   }
 }
@@ -74,6 +103,17 @@ function fBCxxRead(nAddr){
 
 function fBCxxWrite(nAddr,nVal){
   switch (a = nAddr){
+
+    case 0xbde8:
+      nBDE8 = nVal;
+      return;
+
+    case 0xbde9:
+      nBDE9 = nVal;
+      return;
+
+    case 0xbdea:
+      return fMouseCtrl(nBDEAw = nVal);
 
     case 0xbffe:
       if (bRAMROM_enable){
@@ -92,7 +132,7 @@ function fBCxxWrite(nAddr,nVal){
         return aBFFE;
       } else {
         aBFFE=0;
-        return 0;
+        return;
       }
 
     case 0xbfff:
@@ -101,7 +141,7 @@ function fBCxxWrite(nAddr,nVal){
         return (aBFFF);
       } else {
         aBFFF = 0;
-        return 0;
+        return;
       }
 
     default:
@@ -110,3 +150,4 @@ function fBCxxWrite(nAddr,nVal){
   }
 }
 
+function fMouseCtrl(val){fDebug("Mouse pointer: "+(val &0x0f));}

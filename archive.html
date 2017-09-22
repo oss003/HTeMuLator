@@ -1,0 +1,143 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+	<head>
+
+		<title>
+			Acorn Atom Archive Web Menu
+		</title>
+
+		<style type = "text/css">
+
+			@font-face
+			{
+				font-family:	"atom_font";
+				src:			url("./atom_font.eot");
+				src:			url("./atom_font.eot?#iefix")				format("embedded-opentype"),
+								url("./atom_font.woff")						format("woff"),
+								url("./atom_font.ttf")						format("truetype"),
+								url("./atom_font.svg#courier_newregular")	format("svg");
+				font-weight:	normal;
+				font-style:		normal;
+			}
+
+			body
+			{
+				border:			0px;
+				margin:			0px;
+				padding:		0px;
+				font:			28px atom_font, Tahoma, "Lucida Console", monospace;
+				color:			white;
+			}
+
+			img
+			{
+				padding:		4px;
+				border:			1px solid green;
+			}
+
+		</style>
+
+	</head>
+	<body>
+		<table width = "100%" cellpadding = "2" cellspacing = "0">
+			<script type = "text/javascript" language = "JavaScript" src = "./archive_database.js"></script>
+			<script type = "text/javascript">
+
+				<!--
+
+var aDSKs = [], bLocal = document.location.href.substr(0, 7).toLowerCase() == "file://", ARGV = new VARG_type();
+
+function VARG_type()	// VARG (Variable ARGument) defaults
+{
+	this.filter = "";
+}
+
+function VARG_get(o)
+{
+	var js = self.location.search.substring(1);
+	if (js) js = js.replace(/=/g, "=\"") + '"';
+	return js == "" ? 0 : eval(o + '.' + unescape(js.replace(/&/g, "\";" + o + '.')));
+}
+
+function D64(s)
+{
+	return s;
+}
+
+function fDiskRead(sIndex, sContents)
+{
+	aDSKs [sIndex] = sContents;
+}
+
+function fImage(n)
+{
+	for (var i = 0, f = 0; !f && i < aImages.length; ++i) f = aImages [i][0] == n;
+	return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAADA" + aImages [f ? i-1 : 0] [1];
+}
+
+function fLaunch(nDisk)
+{
+	document.location.href = "./" + (bLocal ? "index.html" : "") + "?disk0=" + nDisk + "&autoboot=2";
+}
+
+function fDownload(nDisk)
+{
+	//	data:application/octet-stream;base64,		OR		data:application/binary;base64,
+
+	// This trick will generate a temp <a /> tag, ...
+	var eLink = document.createElement('a');
+//	eLink.href = "data:application/octet-stream;base64," + window.btoa(fPad(window.atob(aDSKs [nDisk]), String.fromCharCode(0), 256 * 10 * 40));
+//	eLink.href = "data:application/octet-stream;base64," + fDisk(aDSKs [nDisk]);
+	eLink.href = "data:application/octet-stream;base64," + aDSKs [nDisk];
+
+	// ... set the visibility hidden so it will not effect the page layout, ...
+	eLink.style = "visibility: hidden;";
+	eLink.download = "Disk" + nDisk + ".dsk"
+
+	// ... append the anchor tag and remove it after automatic click
+	document.body.appendChild(eLink);
+	eLink.click();
+	document.body.removeChild(eLink);
+}
+
+function fDisk(s)
+{
+	var c = String.fromCharCode(0), i = (s = window.atob(s)).length, n = 256 * 10 * 40;
+	for (; i < n; ++i) s += c; return window.btoa(s);
+}
+
+function fPad(s, c, n)
+{
+	for (var i = s.length; i < n; ++i) s += c;
+	return s;
+}
+
+function fWrite(s)
+{
+	document.write(s);
+}
+
+VARG_get("ARGV");
+
+var c, d, f, i, l, n, r, s, t, sDownload = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAADAAQMAAADRIy8lAAAAK3RFWHRDcmVhdGlvbiBUaW1lAFR1ZSA1IEZlYiAyMDEzIDIzOjAwOjAyIC0wMDAwquit9AAAAAd0SU1FB+EJDBYOIZxLXVwAAAAJcEhZcwAACvAAAArwAUKsNJgAAAAEZ0FNQQAAsY8L/GEFAAAABlBMVEUAAAAA/wA2Q0S9AAAApElEQVR42u3WUQqEMBAD0LnB3P+WucGsrlsqtosfQlIw+Sr6PoK2OlE3CTaIbwyeP8nnYIXnYPA33g8GOhCnqAD6/VSBmnVkA0w6skFNOtIBxo50oD+brWVqQQ0dBQDXjgJQMVzgA6QeDCGDBb7VK/yzIo83hUTIQDVQBgYGHbSj+3Lg5W/ZBq3Xg22vGKQeIPTgmDB2AB3AzaDFAH3iLB2YhQA+w+O6fizkhVoAAAAASUVORK5CYII=";;
+
+l = "FGHI"; t = "Click here to "
+for (d = 0, n = 0, r = 0; d < aDisks.length; ++d) {
+	for (f = false, i = 0; !f && i < aData.length; ++i) f = aData [i][0]*1 == aDisks [d];
+	if (f) {
+		--i; ++n; ++r; fWrite("<tr style = 'background-color: #" + (r & 1 ? "444" : "222") + ";'>"); s = fImage(aData [i][0]);
+		fWrite("<td><img src = " + s + " width = 64px onclick = \"fLaunch(" + aData [i][0] + ")\" title = \"" + t + "play this game\"></td>");
+		fWrite("<td><img src = \"" + sDownload + "\" width = 64px onclick = \"fDownload(" + aData [i][0] + ")\" title = \"" + t + "download disk#" + aData [i][0] + "\"></td>");
+//		fWrite("<td>" + aData [i][0] + "</td>");
+		fWrite("<td>" + n + "</td>");
+		for (c = 0; c < aData [i].length; ++c)
+			if (l.indexOf(String.fromCharCode(65 + c)) >= 0) fWrite("<td>" + aData [i] [c].toUpperCase() + "</td>");
+		fWrite("</tr>"); } }
+
+				// -->
+
+			</script>
+			<script type = "text/javascript" language = "JavaScript" src = "./archive.js"></script>
+		</table>
+	</body>
+</html>
