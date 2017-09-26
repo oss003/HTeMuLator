@@ -224,6 +224,8 @@ function fResized()
 	clearTimeout(oRSG);
 	oRSG = false;
 	fInitCanvas();
+	fInitMouse();
+	fMousePointer(nBDEAw);
 	fMode(0, (nPal ^=1 ) ^ 1);
 }
 
@@ -266,7 +268,7 @@ var
 
         aFileData = [],
 	HIMEM,									// Top of RAM
-	//MEM = [],								// RAM array
+	// MEM = [],							// RAM array
 	// bSpkr = 0,
 	bSync = 0,
 
@@ -370,19 +372,13 @@ function f60Hz()
 
 function fBreak()
 {
-	if (InitialStart == true){
-	  InitialStart = false;
-	} else {
-	  configByte = 0xff;
-	}
-	if (this.autoboot==2){
-	  sSDROMe_ROM = sSDROMe_ROM.substr(0,0x72)+"*!BOOT"+sSDROMe_ROM.substr(0x72+6);
-	}
+	if (InitialStart == true) InitialStart = false; else configByte = 0xff;
+	if (this.autoboot == 2) sSDROMe_ROM = sSDROMe_ROM.substr(0, 0x72) + "*!BOOT" + sSDROMe_ROM.substr(0x72 + 6);
 	fVIAReset();
 	RST();
-	if(oClock)clearInterval(oClock);oClock=setInterval(f60Hz, Math.floor(1000 / 60));
-        if (nFileSystem == 1){aFileData=aTapes.concat([]);}
-        if (nFileSystem == 2){aFileData=aDisks.concat([]);}
+	if (oClock) clearInterval(oClock); oClock = setInterval(f60Hz, Math.floor(1000 / 60));
+	if (nFileSystem == 1) aFileData = aTapes.concat([]);
+	if (nFileSystem == 2) aFileData = aDisks.concat([]);
 }
 
 function fRun()
@@ -614,19 +610,14 @@ function fSetDemo(s)
 function fStartUp()
 {
 	if (ARGV.debug) fToggleDebug();
-//	screenfull.toggle(document.getElementById('body'));
+	// screenfull.toggle(document.getElementById('body'));
 	// document.getElementById("bFull").click();
 	fInitAddr();
 	fClearMemory();
 	fMakeAtomFont();
 	fDisplay();
 	fResize();
-
-	onEvent(e5, "mousemove", fMouseMove);
-	onEvent(e5, "mousedown", fMouseDown);
-	onEvent(e5, "contextmenu", fContext);
-	onEvent(e5, "mouseup",   fMouseUp);
-
+	fInitMouse();
 	fMain();
 	fLogin();
 }

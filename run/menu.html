@@ -5,68 +5,100 @@
 		<link rel = "icon" type = "image/x-icon" href = "favicon.ico" />
 
 		<title>
-			Acorn Atom Archive Web Menu
+			Acorn Atom Software Archive
 		</title>
 
 		<style type = "text/css">
 
 			@font-face
 			{
-				font-family:	"atom_font";
-				src:			url("./atom_font.eot");
-				src:			url("./atom_font.eot?#iefix")				format("embedded-opentype"),
-								url("./atom_font.woff")						format("woff"),
-								url("./atom_font.ttf")						format("truetype"),
-								url("./atom_font.svg#courier_newregular")	format("svg");
-				font-weight:	normal;
-				font-style:		normal;
+				font-family:		"atom_font";
+				src:				url("./atom_font.eot");
+				src:				url("./atom_font.eot?#iefix")				format("embedded-opentype"),
+									url("./atom_font.woff")						format("woff"),
+									url("./atom_font.ttf")						format("truetype"),
+									url("./atom_font.svg#courier_newregular")	format("svg");
+				font-weight:		normal;
+				font-style:			normal;
 			}
 
 			body
 			{
-				border:			0px;
-				margin:			0px;
-				padding:		0px;
-				font:			16px atom_font, Tahoma, "Lucida Console", monospace;
-				color:			white;
+				border:				0px;
+				margin:				0px;
+				padding:			0px;
+				font:				16px atom_font, Tahoma, "Lucida Console", monospace;
+				color:				white;
 			}
 
 			button
 			{
-				width:			40px;
-				height:			40px;
-				line-height:	35px;
-				font:			16px atom_font, Tahoma, "Lucida Console", monospace;
-				margin:			2px;
+				width:				32px;
+				height:				32px;
+				line-height:		35px;
+				font:				16px atom_font, Tahoma, "Lucida Console", monospace;
+				margin:				2px;
+				cursor:				pointer;
 			}
 
 			img
 			{
-				padding:		4px;
+				margin-top:			10px;
+				padding:			4px;
+				cursor:				pointer;
 			}
 
-			h1, h2
+			h1, h2, h3
 			{
-				font-weight:	normal;
-				line-height:	16px;
-				margin:			5px 0px;
+				font-weight:		normal;
+				font-size:			80px;
+				margin:				5px 0px;
+			}
+
+			h2
+			{
+				font-size:			32px;
+			}
+
+			h3
+			{
+				font-size:			24px;
+			}
+
+			.cSummary
+			{
+				display:			inline-block;
+				width:				280px;
+				height:				384px;
+				background-color:	#666; margin: 12px 4px;
+			}
+
+			#dResults
+			{
+				margin-top:			10px;
+				height:				440px;
+				overflow-y:			auto;
+			}
+
+			#dStatus
+			{
+				colour:				black;
 			}
 
 		</style>
 
-	</head>
-	<body>
-		<table style = "width: 98%; margin: 1% 1%; background-color: silver;">
-			<script type = "text/javascript" language = "JavaScript" src = "./archive_database.js"></script>
-			<script type = "text/javascript">
+		<script type = "text/javascript" language = "JavaScript" src = "./archive_database.js"></script>
+		<script type = "text/javascript">
 
-				<!--
+			<!--
 
 var aDSKs = [], bLocal = document.location.href.substr(0, 7).toLowerCase() == "file://", ARGV = new VARG_type();
 
 function VARG_type()	// VARG (Variable ARGument) defaults
 {
 	this.filter = "";
+	this.game = 0;
+	this.autoboot = 0;
 }
 
 function VARG_get(o)
@@ -76,25 +108,14 @@ function VARG_get(o)
 	return js == "" ? 0 : eval(o + '.' + unescape(js.replace(/&/g, "\";" + o + '.')));
 }
 
-function fSearch(s)
-{
-	alert("Searching for titles beginning with the letter '" + s + "'");
-}
+function D64(s) { return s; } // Dummy Decode base 64 since we are download it as a base64 data url
 
-function D64(s)
-{
-	return s;
-}
-
-function fDiskRead(sIndex, sContents)
-{
-	aDSKs [sIndex] = sContents;
-}
+function fDiskRead(sIndex, sContents) { aDSKs [sIndex] = sContents; }
 
 function fImage(n)
 {
-	for (var i = 0, f = 0; !f && i < aImages.length; ++i) f = aImages [i][0] == n;
-	return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAADA" + aImages [f ? i-1 : 0] [1];
+	n = sImages.indexOf('$' + ("00" + n).substr(-3));
+	return "\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAADA" + aImages [n >= 0 ? (n >> 2) + 1 : 0] [1] + '"';
 }
 
 function fLaunch(nDisk)
@@ -104,19 +125,10 @@ function fLaunch(nDisk)
 
 function fDownload(nDisk)
 {
-	//	data:application/octet-stream;base64,		OR		data:application/binary;base64,
-
-	// This trick will generate a temp <a /> tag, ...
 	var eLink = document.createElement('a');
-//	eLink.href = "data:application/octet-stream;base64," + window.btoa(fPad(window.atob(aDSKs [nDisk]), String.fromCharCode(0), 256 * 10 * 40));
-//	eLink.href = "data:application/octet-stream;base64," + fDisk(aDSKs [nDisk]);
 	eLink.href = "data:application/octet-stream;base64," + aDSKs [nDisk];
-
-	// ... set the visibility hidden so it will not effect the page layout, ...
 	eLink.style = "visibility: hidden;";
 	eLink.download = "Disk" + nDisk + ".dsk"
-
-	// ... append the anchor tag and remove it after automatic click
 	document.body.appendChild(eLink);
 	eLink.click();
 	document.body.removeChild(eLink);
@@ -134,43 +146,109 @@ function fPad(s, c, n)
 	return s;
 }
 
-function fWrite(s)
+function fButton(s, t, c, d)
 {
-	document.write(s);
+	return "<button" + (s ? " style = \"" + s + "\"" : "") + " title = \"" + t + "\" onclick = \"" + c + "\">" + d + "</button>";
 }
+
+function fSearchOpt(c)
+{
+	return fButton("", "Click here to select titles beginning with " + (c == '#' ? "a number" : "the letter '" + c + "'"), "fSearch('" + c + "')", c);
+}
+
+function fHeader()
+{
+	var c, sHTML = sTable + "<tr>\n<th>";
+	sHTML += "<h1>ACORN ATOM SOFTWARE ARCHIVE</h1></th>\n</tr>\n<tr>\n<th colspan = \"4\">\n" + fSearchOpt('#');
+	for (c = 'A'.charCodeAt(0); c <= 'Z'.charCodeAt(0); ++c) sHTML += fSearchOpt(String.fromCharCode(c));
+	return sHTML + "\n<br />\n<br />\n</th>\n</tr>\n</table>\n";
+}
+
+function fSort(a, b)
+{
+	a = aData [a] [6].toLowerCase();
+	b = aData [b] [6].toLowerCase();
+	return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function fSummary(n, nRecord, sPublisher, sType, sTitle)
+{
+	var sHTML = "<div class = \"cSummary\">\n";
+	sHTML += "<img src = " + fImage(nRecord) + " title = \"Click here for more information about " + sTitle + "\" onClick = \"fDetails(" + n + ")\">\n";
+	sHTML += "<table style = \"width: 100%; height: 70px\"><tr><th><h2>" + sTitle.toUpperCase() + "</h2></th></tr></table>\n";
+	sHTML += "<h3>" + sPublisher.toUpperCase() + "</h3>\n";
+	sHTML += "<h3>" + sType.toUpperCase() + "</h3>\n";
+	sHTML += fButton("width: 100px", "Click here to download " + sTitle, "fDownload(" + nRecord + ')', "DOWNLOAD") + '\n';
+	sHTML += fButton("width: 100px", "Click here to play " + sTitle,     "fLaunch("   + nRecord + ')', "PLAY")     + '\n';
+//	sHTML += "<h3>RECORD NUMBER: " + sRecordNr + "</h3>\n";
+	return sHTML + "</div>\n";
+}
+
+function fResults(c)
+{
+	var i, n, r, sHTML = sTable;
+	for (i = 0, r = 0; i < nResults; ++i) {
+		n = aResults [i]; sHTML += (r++ % c ? "" : "<tr>\n") + "<th>\n";
+		//						nRecordNr,		sPublisher,		sType,			sTitle
+		sHTML += fSummary(n,	aData [n] [0],	aData [n] [2],	aData [n] [5],	aData [n] [6]);
+		sHTML += "</th>\n" + (r % c ? "" : "</tr>\n"); }
+	return sHTML + "</table>\n";
+}
+
+function fDetails(n)
+{
+	var sHTML = sTable; document.getElementById("dResults").style.height = "auto";
+	sHTML += "<tr><th colspan = \"2\"><h1>" + aData [n] [6].toUpperCase() + "</h1></th></tr>\n";
+	sHTML += "<tr><th><h2 style = \"text-align: left\">SCREENSHOT:</h2>";
+	sHTML += "<img src = " + fImage(aData [n] [0]) + " title = \"Click here to play " + aData [n] [6] + "\" onClick = \"fLaunch(" + aData [n] [0] + ")\" width = \"512px\">\n";
+	sHTML += "</th><td width = \"50%\">";
+// 	["Index","Updated","ShortPub","Publisher","Chunk","Title","Genre","Author (if known)","Directory","Boot Address","To Run","Notes","Filenames","Status","Collection","32K RAM","FP ROM","Documentation Link","",""],
+// 	["844","V9B1","NC","Non Comm","C","Non Commercial Software","Pacman (JS)","Game","Thony Brown","JS/WIM","8200","CH.&#34;PACMAN&#34;","Works","PACMAN","present","Joystick\nJoystick Kbd","","","","",""],
+//	["680","V6","NC","Non Comm","C","Non Commercial Software","3-2-1","Game","Phil Mainwaring","NC","8200","CH.&#34;3-2-1&#34;","Works","3-2-1","present","Mainwaring","","","","",""],
+
+	sHTML += "<h2>DETAILS:</h2><br /><br />";
+	sHTML += "<h2>TITLE: " + aData [n] [6].toUpperCase() + "</h2>\n";
+	sHTML += "<h2>AUTHOR: " + aData [n] [8].toUpperCase() + "</h2>\n";
+	sHTML += "<h2>GENRE: " + aData [n] [7].toUpperCase() + "</h2>\n";
+	sHTML += "<h2>NOTES: " + aData [n] [12].toUpperCase() + "</h2>\n";
+	sHTML += "<h2>PUBLISHER: " + aData [n] [5].toUpperCase() + "</h2>\n";
+	sHTML += "<h2>VERSION: " + aData [n] [1].toUpperCase() + "</h2><br /><br />\n";
+	sHTML += "<center>" + fButton("width: 300px", "Click here to download " + aData [n] [6], "fDownload(" + aData [n] [0] + ')', "DOWNLOAD") + "<br /><br />\n";
+	sHTML += fButton("width: 300px", "Click here to play " + aData [n] [6], "fLaunch("   + aData [n] [0] + ')', "PLAY")     + '</center>\n';
+	sHTML += "</td></tr></table>"; fWrite("dResults", sHTML); fWrite("dStatus", "");
+//	alert("User requested more information about " + aData [n] [6]);
+}
+
+function fSearch(s)
+{
+	if (ARGV.game)
+		{ fWrite("dHeader", fHeader()); fDetails(ARGV.game); if (ARGV.autoboot > 0) setTimeout(function(){ fLaunch(ARGV.game); }, ARGV.autoboot * 1000); return; }
+	nResults = 0; aResults = []; l = (s = s ? s.toLowerCase() : "").length; document.getElementById("dResults").style.height = "440px";
+	for (i = 0; i < nRows; ++i) if (!s || aData [aRows [i]] [6].substr(0, l).toLowerCase() == s) aResults [nResults++] = aRows [i]; aResults.sort(fSort);
+	sResults = fResults(4); fWrite("dHeader", fHeader()); fWrite("dResults", sResults);
+	fStatus("<h2>" + nResults + " RECORD" + (nResults - 1 ? 'S' : "") + " FOUND</h2>");
+}
+
+function fStatus(s) { fWrite("dStatus", sTable + "<tr><th>" + s + "</th></tr></table>"); }
+
+function fWrite(e, s) { document.getElementById(e).innerHTML = s; }
 
 VARG_get("ARGV");
 
-var c, f, i, l, n, r, s, t = "Click here to ";
+var f, i, n, nRows = 0, nResults, sResults, aRows = [], aResults, sDisks = "", sImages = "",
+	sTable = "<table style = \"width: 98%; margin: 1% 1%; background-color: silver;\">\n";
 
-fWrite("<tr><th colspan = \"4\">");
-for (n = 'A'.charCodeAt(0); n <= 'Z'.charCodeAt(0); ++n)
-	fWrite("<button title = \"" + t + " to select titles beginning with the letter '" + (c = String.fromCharCode(n)) + "'\" onclick = \"fSearch('" + c + "')\">" + c + "</button>");
-fWrite("</tr></td>");
-
-for (i = 0, r = 0; i < aDisks.length; ++i) {
-	for (f = false, n = 0; !f && n < aData.length; ++n) f = aData [n][0]*1 == aDisks [i]; --n;
-	if (f) {
-		sImage		= aData [n] [0];
-		sRecordNr	= aData [n] [0];
-		sPublisher	= aData [n] [2].toUpperCase();
-		sType		= aData [n] [5].toUpperCase();
-		sTitle		= aData [n] [6].toUpperCase();
-
-		fWrite((r++ % 4 ? "" : "<tr>") + "<th><div style = \"display: inline-block; width: 280px; height: 420px; background-color: #666; margin: 4px;\">");
-		fWrite("<img src = " + fImage(sImage) + " width = \"256px\">");
-		fWrite("<table style = \"width: 100%; height: 70px\"><tr><th><h1>" + sTitle + "</h1></th></tr></table>");
-		fWrite("<h2>" + sPublisher + "</h2>");
-		fWrite("<h2>" + sType + "</h2>");
-		fWrite("<button style = \"width: 100px\" onclick = \"fDownload(" + sRecordNr + ")\" title = \"" + t + "download this game\">DOWNLOAD</button>&nbsp;&nbsp;&nbsp;");
-		fWrite("<button style = \"width: 100px\" onclick = \"fLaunch(" + sRecordNr + ")\" title = \"" + t + "play this game\">PLAY</button>");
-		fWrite("<h2>RECORD NUMBER: " + sRecordNr + "</h2>");
-		fWrite("</div></th>" + (r % 4 ? "" : "</tr>")); } }
+for (i = 0; i < aCat.length; sDisks += '$' + ("00" + aCat [i++]).substr(-3));				// Index of disks in this archive
+for (i = 1; i < aImages.length; sImages += '$' + ("00" + aImages [i++] [0]).substr(-3));	// Disk number to image data lookup
+for (i = 0; i < aData.length; ++i) if (sDisks.indexOf('$' + ("00" + aData [i] [0]).substr(-3)) >= 0) aRows [nRows++] = i;
 
 				// -->
 
-			</script>
-			<script type = "text/javascript" language = "JavaScript" src = "./archive.js"></script>
-		</table>
+		</script>
+		<script type = "text/javascript" language = "JavaScript" src = "./archive.js"></script>
+
+	</head>
+	<body onload = "fSearch()">
+		<div id = "dHeader"></div><div id = "dResults"></div><div id = "dStatus"></div>
 	</body>
 </html>

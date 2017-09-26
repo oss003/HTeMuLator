@@ -312,8 +312,7 @@ INS =	// INStructions		-> I
 /* 1D ORA Absolute,X	3 4 *	% ~ 1 ~ ~ ~ % ~ */	function(){ORA(ABX)},
 /* 1E ASL Absolute,X	3 7		% ~ 1 ~ ~ ~ % % */	function(){ASL(ABX)},
 /* 1F *** INVALID		1 2		~ ~ 1 ~ ~ ~ ~ ~ */	N0P,
-/* 20 JSR Absolute		3 6		~ ~ 1 ~ ~ ~ ~ ~ */	function(){PHW((PCR+FLC)&WRD);PCR=IMW(PCR)},
-// 20 JSR Absolute		3 6		~ ~ 1 ~ ~ ~ ~ ~ */	function(){PHW(PCR);PCR=IMW(PCR)}, //addr=getw(); pc--; push(pc >> 8); push(pc); pc=addr;
+/* 20 JSR Absolute		3 6		~ ~ 1 ~ ~ ~ ~ ~ */	function(){PHW((PCR+FLC)&WRD);PCR=IMW(PCR)},	//function(){PHW(PCR);PCR=IMW(PCR)},	//addr=getw(); pc--; push(pc >> 8); push(pc); pc=addr;
 /* 21 AND (Indirect,X)	2 6		% ~ 1 ~ ~ ~ % ~ */	function(){AND(XID)},
 /* 22 *** INVALID		1 2		~ ~ 1 ~ ~ ~ ~ ~ */	N0P,
 /* 23 *** INVALID		1 2		~ ~ 1 ~ ~ ~ ~ ~ */	N0P,
@@ -345,14 +344,7 @@ INS =	// INStructions		-> I
 /* 3D AND Absolute,X	3 4 *	% ~ 1 ~ ~ ~ % ~ */	function(){AND(ABX)},
 /* 3E ROL Absolute,X	3 7		% ~ 1 ~ ~ ~ % % */	function(){ROL(ABX)},
 /* 3F *** INVALID		1 2		~ ~ 1 ~ ~ ~ ~ ~ */	N0P,
-
-/* 40 RTI Implied		1 6		% % 1 ~ % % % % */	function(){
-	FLG=PLB()|FLR|FLB;
-	FLG&FLD?(ADD=DAD,SUB=DSB):(ADD=BAD,SUB=BSB);
-	PCR=PLW()
-},	// function(){FLG=PLB();PCR=PLW()},
-///* 40 RTI Implied		1 6		% % 1 ~ % % % % */	function(){FLG=PLB();PCR=PLW()},	// function(){FLG=PLB();PCR=PLW()},
-
+/* 40 RTI Implied		1 6		% % 1 ~ % % % % */	function(){FLG=PLB()|FLR|FLB;FLG&FLD?(ADD=DAD,SUB=DSB):(ADD=BAD,SUB=BSB);PCR=PLW()},	// function(){FLG=PLB();PCR=PLW()},
 /* 41 EOR (Indirect,X)	2 6		% ~ 1 ~ ~ ~ % ~ */	function(){EOR(XID)},
 /* 42 *** INVALID		1 2		~ ~ 1 ~ ~ ~ ~ ~ */	N0P,
 /* 43 *** INVALID		1 2		~ ~ 1 ~ ~ ~ ~ ~ */	N0P,

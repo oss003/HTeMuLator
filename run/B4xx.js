@@ -569,7 +569,7 @@ function fMMCWrite(nAddr,nVal){
 
             case CMD_WRITE_PORT:
               // write portb
-              nJoyMMC = nVal;
+//              nJoyMMC = nVal;
               WriteDataPort(STATUS_OK);
               break;
 
