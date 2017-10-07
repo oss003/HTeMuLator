@@ -17,7 +17,7 @@
 
 var
 // Dis-/enable hardware emulation for devices
-        bAtoMMC_enable = true,
+	bAtoMMC_enable = true,
 	debug = ARGV.debug * 1,		// Output to debug window on/off
 
 // AtoMMC vars
@@ -37,7 +37,7 @@ var
 //	CMD_FILE_DELETE		= 0x14,
 //	CMD_FILE_GETINFO	= 0x15,
 //	CMD_FILE_SEEK		= 0x16,
-//	CMD_FILE_OPEN_RAF       = 0x17,
+//	CMD_FILE_OPEN_RAF	= 0x17,
 
 	CMD_INIT_READ		= 0x20,
 	CMD_INIT_WRITE		= 0x21,
@@ -61,6 +61,20 @@ var
 	CMD_SET_PORT_DDR	= 0xA1,
 	CMD_READ_PORT		= 0xA2,
 	CMD_WRITE_PORT		= 0xA3,
+
+	CMD_GET_TIME		= 0xB0, // HTeMuLator commands
+	CMD_GET_DATE		= 0xB1,
+	CMD_GET_UNIX_TIME	= 0xB2,
+	CMD_SET_DATE		= 0xB3,
+	CMD_SET_TIME		= 0xB4,
+	CMD_SET_UNIX_TIME	= 0xB5,
+
+	CMD_WEB_REQUEST		= 0xC0, // HTeMuLator web commands
+	CMD_WEB_STATE		= 0xC1,
+
+	CMD_SET_ENV		= 0xD0, // HTeMuLator environment settings
+	CMD_GET_ENV		= 0xD1,
+
 	CMD_GET_FW_VER		= 0xE0,
 	CMD_GET_BL_VER		= 0xE1,
 	CMD_GET_CFG_BYTE	= 0xF0,
@@ -88,10 +102,24 @@ var
 	globalIndex = 0,		// Data array pointer
 	byteValueLatch,			// Latch bytevalue
 	globalLBAOffset = 0,		// Disk image array pointer
-        heartbeat = 0x55,
+	heartbeat = 0x55,
 	autoboot = ARGV.autoboot * 1,
 	configByte = (autoboot == 0) ? 0xff : 0,	// Configuration byte AtoMMC
 	nJoyMMC = 0xff,			// AtoMMC joystick 
+        sCMDS="$debug-$bran-",          // Javascript commands to be read/write by CMD_SET/GET_ENV
+
+	oDate,
+
+	nMonth,
+	nYear,
+	nDay,
+
+	nHour,
+	nMinute,
+	nSecond,
+	nCentiSecs,
+
+	vUnixTime,
 
 // SDROM vars
 	globalCurDrive = 0,		// Current selected Drive
@@ -99,7 +127,7 @@ var
 	sDirFilter = "/",		// Directory
 	DirPointer = 0,			// Directory pointer Disk array
 	FilePointer = 0,		// File pointer Tape array
-	BytePointer = 0;                // Pointer within file
+	BytePointer = 0;		// Pointer within file
 
 function Struct(val1,name, val2)	// Structure for driveinfo table
 {
@@ -146,7 +174,7 @@ function fMMCRead(nAddr){
         break;
 
       case LATCH_REG:
-        Ret = 0;
+        Ret = LATD;
         break;
 
       case READ_DATA_REG:
@@ -561,6 +589,7 @@ function fMMCWrite(nAddr,nVal){
             case CMD_SET_PORT_DDR:
               // set portb direction register
               WriteDataPort(STATUS_OK);
+              break;
 
             case CMD_READ_PORT:
               // read portb
@@ -572,6 +601,80 @@ function fMMCWrite(nAddr,nVal){
 //              nJoyMMC = nVal;
               WriteDataPort(STATUS_OK);
               break;
+
+// New RTC / HTeMuLator commands
+
+            case CMD_GET_TIME:
+              fTimeDate();
+              globalData [1] = parseInt(nHour      + "", 16);		// UTC Time returned in BCD format
+              globalData [2] = parseInt(nMinute    + "", 16);
+              globalData [3] = parseInt(nSecond    + "", 16);
+              globalData [4] = parseInt(nCentiSecs + "", 16);
+              break;
+
+            case CMD_GET_DATE:
+              fTimeDate();
+              globalData [1] = parseInt(nDay   + "", 16);			// UTC Date returned in BCD format
+              globalData [2] = parseInt(nMonth + "", 16);
+              globalData [3] = parseInt(nYear  + "", 16);
+              break;
+
+            case CMD_GET_UNIX_TIME:
+              fTimeDate();
+              for (i = 0; i < 7; globalData [i + 1] = vUnixTime [i++]);
+              break;
+
+            case CMD_SET_DATE:
+              oDate.setYear(globalData[0]);
+              oDate.setMonth(globalData[1]);
+              oDate.setDay(globalData[2]);
+              break;
+
+            case CMD_SET_TIME:
+              oDate.setHours(globalData[0]);
+              oDate.setMinutes(globalData[1]);
+              oDate.setSeconds(globalData[2]);
+              oDate.setMilliseconds(globalData[3]);
+              break;
+
+            case CMD_SET_UNIX_TIME:
+              nYear=globalData[0];
+              nMonth=globalData[1];
+              nDay=globalData[2];
+              nHour=globalData[3];
+              nMinute=globalData[4];
+              nSecond=globalData[5];
+              nCentiSecond=globalData[6];
+              oDat.UTC(nYear,nMonth,nDay,nHour,nMinute,nSecond,nCentiSecond);
+              break;
+
+            case CMD_WEB_REQUEST:
+              // web page in globalData[] ending with 0
+		Ret = getPage("file:///C:/Users/gebruiker/Documents/Atom/HTeMuLator/_HTeMuLator_latest/run/index.html");
+              break;
+
+            case CMD_WEB_STATE:
+              WriteDataPort(STATUS_OK);
+              break;
+
+            case CMD_SET_ENV:
+              var nPtr=0, sCommand="", sEnvCom="", bSupported;
+              while (globalData[nPtr] !=0){sEnvCom += String.fromCharCode(globalData[nPtr]);++nPtr;}
+              sCommand=sEnvCom.split("=");
+              bSupported = sCMDS.indexOf('$'+sCommand[0].toLowerCase()+"-") >= 0
+              if (bSupported){eval(sEnvCom.toLowerCase());WriteDataPort(STATUS_OK);break;}
+              WriteDataPort(0xff);
+              break;
+
+            case CMD_GET_ENV:
+              var nPtr=0, sEnvCom="", bSupported;
+              while (globalData[nPtr] !=0){sEnvCom += String.fromCharCode(globalData[nPtr]);++nPtr;}
+              bSupported = sCMDS.indexOf('$'+sEnvCom.toLowerCase()+"-") >= 0
+              if (bSupported){globalData[1]=eval(sEnvCom.toLowerCase());WriteDataPort(STATUS_OK);break;}
+              WriteDataPort(0xff);
+              break;
+
+// ---
 
             case CMD_SET_CFG_BYTE:
               // write config byte
@@ -632,6 +735,30 @@ function WriteDataPort(nVal){LATD = nVal;}
 /*
 ;--------------------------------------------------------------
 ;
+; Get time/date
+;
+;--------------------------------------------------------------
+*/
+
+function fTimeDate()
+{
+	oDate = new Date();
+	nDay = oDate.getDate(); nMonth = oDate.getMonth() + 1; nYear =  oDate.getFullYear() % 100;
+	nHour = oDate.getHours(); nMinute = oDate.getMinutes(); nSecond = oDate.getSeconds(); nCentiSecs = oDate.getMilliseconds() / 10 | 0;
+	vUnixTime = fHex52(oDate.getTime());
+}
+
+function fHex52(n)	// 52 bit / 7 byte hex value
+{
+	var h = [], i;
+	n = ("0000000000000" + n.toString(16)).substr(-14);
+	for (i = 0; i < 7; ++i) h [i] = parseInt(n.substr(12 - (i << 1), 2), 16);
+	return h;
+}
+
+/*
+;--------------------------------------------------------------
+;
 ; tDebug(sLine)
 ;
 ; Write sLine to debug window if debug<>0
@@ -668,3 +795,12 @@ function matchDir(str, rule){
       return true;
   }
 }
+
+function getPage(downloadUrl) {
+	var accessToken = null;
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', downloadUrl, true);
+        xhr.setRequestHeader('Authorization', 'Bearer ' + accessToken);
+        xhr.overrideMimeType('text/plain; charset=x-user-defined');
+	return xhr.responseText; 
+} 

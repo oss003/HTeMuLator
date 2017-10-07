@@ -3,6 +3,11 @@
 ; BCxx.js, IO addresses #BC00-#BFFF                     KC 2017
 ;--------------------------------------------------------------
 ;
+; Mouse emulation:
+;    #BDE8 - X-pos mouse pointer (0-255)
+;    #BDE9 - Y-pos mouse (64-255, 255 = top)
+;    #BDEA -  mouse control
+;
 ; RAMROM emulation:
 ;    #BFFE - Status register RAMROM board
 ;    #BFFF - Switch byte util roms at #Axxx

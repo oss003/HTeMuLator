@@ -30,6 +30,9 @@ var
     Exxx        = 0xE000,
     Fxxx        = 0xF000,
 
+    bran        = 0,		// BRAN enable/disable flag
+    TSR_RAM	= [],		// TSR RAM for loading programs
+
     LOMEM       = 0x6000,
     HIMEM       = 0x8000,
     PPIA_ADDR   = Bxxx,
@@ -101,9 +104,9 @@ function fIOPoll(c)
 function fIOR(a)
 {
     if (a >= Bxxx   && a <= 0xB003) return fPIAR(a & 0x03);                     // PIA
-    if (a >= 0xB010 && a <= 0xB20E) return sBRAN_B010.charCodeAt(a - 0xB010);   // BRAN1
+    if (a >= 0xB010 && a <= 0xB20F) return bran ? sBRAN_B010.charCodeAt(a - 0xB010) : TSR_RAM[a - 0xB010];   // BRAN1
     if (a >= 0xB400 && a <= 0xB403) return fMMCRead(a);                         // ATOMMC
-    if (a >= 0xB410 && a <= 0xB6AC) return sBRAN_B410.charCodeAt(a - 0xB410);   // BRAN2
+    if (a >= 0xB410 && a <= 0xB6AC) return bran ? sBRAN_B410.charCodeAt(a - 0xB410) : 0xBF;                  // BRAN2
     if (a >= 0xB800 && a <= 0xB80F) return fVIARead(a);                         // VIA
     if (a >= 0xBDE8 && a <= 0xBDEA) return fBCxxRead(a);                        // Mouse
     if (a >= 0xBFFE)                return fBCxxRead(a);                        // BFFE
@@ -114,6 +117,7 @@ function fIOR(a)
 function fIOW(a, v)
 {
     if (a >= Bxxx   && a <= 0xB003) return fPIAW(a & 0x0F, v);                  // PIA
+    if (a >= 0xB010 && a <= 0xB20F) return bran ? 0 : TSR_RAM[a - 0xB010] = v;  // BRAN1
     if (a >= 0xB400 && a <= 0xB403) return fMMCWrite(a, v);                     // ATOMMC
     if (a >= 0xB800 && a <= 0xB80F) return fVIAWrite(a, v);                     // VIA
     if (a >= 0xBDE8 && a <= 0xBDEA) return fBCxxWrite(a, v);                    // Mouse

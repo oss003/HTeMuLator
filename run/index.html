@@ -203,14 +203,17 @@ function VARG_type()	// VARG (Variable ARGument) defaults
 	this.disk3 = "";
 	this.tape = "";
 	this.prog = "";
+	this.joy1 = 0;
+	this.joy2 = 0;
 	this.autoboot = "";
 }
 
 function VARG_get(o)
 {
-	var js = self.location.search.substring(1);
-	if (js) js = js.replace(/=/g, "=\"") + '"';
-	return js == "" ? 0 : eval(o + '.' + unescape(js.replace(/&/g, "\";" + o + '.')));
+	var args = self.location.search.substring(1), l = args.length, menu = l < 5 ? args.toLowerCase() : "";
+	if (menu == 'm' || menu == "menu") document.location.href = "menu.html";
+	if (args) args = args.replace(/=/g, "=\"") + '"';
+	return args == "" ? 0 : eval(o + '.' + unescape(args.replace(/&/g, "\";" + o + '.')));
 }
 
 function fResizeGr()
@@ -225,7 +228,6 @@ function fResized()
 	oRSG = false;
 	fInitCanvas();
 	fInitMouse();
-	fMousePointer(nBDEAw);
 	fMode(0, (nPal ^=1 ) ^ 1);
 }
 
@@ -238,6 +240,7 @@ var
 	InitialStart = true,	// Check for one time autoboot at BREAK
 
 	bKBEn = true,							// Keyboard enable
+	bJoy = false,
 	bBBC = false,							// Enable BBC mode
 	bGreen = false,
 
@@ -266,7 +269,7 @@ var
 	SYN = 78+(CPUHz / SCRHz)|0,
 	VBL = (SYN * 287.5 / 312.5)|0,
 
-        aFileData = [],
+	aFileData = [],
 	HIMEM,									// Top of RAM
 	// MEM = [],							// RAM array
 	// bSpkr = 0,
@@ -618,6 +621,7 @@ function fStartUp()
 	fDisplay();
 	fResize();
 	fInitMouse();
+	if (ARGV.joy1) $("iJoy1").style.display = "inline-block";
 	fMain();
 	fLogin();
 }
@@ -890,6 +894,8 @@ DEBUG
 		<button onclick = "fToggle()">CODE</button>
 		<button onclick = "fToggleDebug()">DEBUG</button><br>
 		<!--<button id = "bFull" onclick = "screenfull.toggle(document.getElementById('body'))">FULLSCREEN</button><br>-->
+		<img id = "iJoy1" src = "joystick_small.png" style = "width: 120px; display: none;" />
 		<div id = "dTxtScreen" onload="fResize();"></div>
 	</body>
 </html>
+

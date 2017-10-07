@@ -285,11 +285,7 @@ Port C - #B002
 		/* 06   6   */"00 00 46 00 f [Free]                          [PC Right Ctrl]",
 		/* 07   7   */"07 45 47 00 e [Atom DELETE]                   [PC Delete]",
 		/* 08   8   */"08 45 08 2f e DELETE          DELETE          Delete",
-
-// PC(~) - Atom(Arrow up) patch
-//		/* 09   9   */"09 46 09 22 e COPY            COPY            Copy",
-		/* 09   9   */"09 56 09 22 e COPY            COPY            Copy",
-
+		/* 09   9   */"09 46 09 22 e COPY            COPY            Copy",
 		/* 0a  10   */"0a 46 4a 00 e [Atom COPY]                     [PC Insert]",
 		/* 0b  11   */"00 00 4b 00 f [Free]                          [PC Function]",
 		/* 0c  12   */"0c bb 4c 00 e [Atom COPY]                     [PC Numeric 5]",
@@ -561,7 +557,6 @@ function reg(k,i,s,p,l,L)
 
 function fATOMPress(nKey)
 {
-
 	// Experimental buffer stuff - ignore
 	if (nKey) szBuffer += String.fromCharCode(nKey >> 8) + String.fromCharCode(nKey & 0xFF);
 	if (!szBuffer) return;

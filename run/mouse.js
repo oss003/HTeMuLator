@@ -22,7 +22,7 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 var
-aKC_Mice =
+aKC_Mice = // ;-)
 [
 	"iVBORw0KGgoAAAANSUhEUgAAACAAAAAgAQMAAABJtOi3AAAAB3RJTUUH4QkZAAUbxt8lSgAAAAlwSFlzAAAK8AAACvABQqw0mAAAAARnQU1BAACxjwv8YQUAAAAGUExURQAAAP///6XZn90AAAABdFJOUwBA5thmAAAAJklEQVR42mP4DwQMaMQHBiDCIPgZiCOw6P0PlEEjgLZ8QCewmAcAdm8+WQwCmgkAAAAASUVORK5CYII=",
 	"iVBORw0KGgoAAAANSUhEUgAAACAAAAAgAQMAAABJtOi3AAAAB3RJTUUH4QkYFzUq6ZLBEwAAAAlwSFlzAAALEgAACxIB0t1+/AAAAARnQU1BAACxjwv8YQUAAAAGUExURQAAAP///6XZn90AAAABdFJOUwBA5thmAAAAF0lEQVR42mP4/4GBgQGN+ICFwKaODgAAwmkW+XaeLnwAAAAASUVORK5CYII=",
@@ -134,14 +134,108 @@ aAtomicMousePointers =
 	"80C0A090888482FF",
 	"01030509112141FF",
 	"FF41211109050301"
-];
+],
+
+	MOUSE_OVER		= 0x01,		// onmouseover
+	MOUSE_MOVE		= 0x02,		// onmousemove
+	MOUSE_DOWN		= 0x04,		// onmousedown		and		oncontextmenu	// MOUSE_MENU
+	MOUSE_UP		= 0x08,		// onmouseup		and		oncontextmenu	// MOUSE_MENU
+	MOUSE_CLICK		= 0x10,		// onclick
+	MOUSE_DBLCLICK	= 0x20,		// ondblclick
+	MOUSE_OUT		= 0x40,		// onmouseout
+	MOUSE_WHEEL		= 0x80,		// onwheel
+
+	JOY_RIGHT	= 0,
+	JOY_LEFT	= 1,
+	JOY_DOWN	= 2,
+	JOY_UP		= 3,
+	JOY_FIRE	= 4,
+
+aMouseEvents =
+[
+	"mouseover",
+	"mousemove",
+	"mousedown",
+	"mouseup",
+	"click",
+	"dblclick",
+	"mouseout",
+	"wheel"
+],
+
+aJoyMMC =
+[
+	1 << JOY_LEFT | 1 << JOY_UP,
+	1 << JOY_UP,
+	1 << JOY_RIGHT | 1 << JOY_UP,
+	1 << JOY_LEFT,
+	0,
+	1 << JOY_RIGHT,
+	1 << JOY_LEFT | 1 << JOY_DOWN,
+	1 << JOY_DOWN,
+	1 << JOY_RIGHT | 1 << JOY_DOWN
+],
+
+aJoyCursors =
+[
+	"nwse-resize",
+	"ns-resize",
+	"nesw-resize",
+	"ew-resize",
+	"move",
+	"ew-resize",
+	"nesw-resize",
+	"ns-resize",
+	"nwse-resize"
+],
+
+nJoy1Pos = 4,
+nJoy2Pos = 4;
+
+function fBit(nByte, nBit, bSet)
+{
+	nBit = 1 << nBit;
+	return bSet ? nByte | nBit : nByte & (255 - nBit);
+}
 
 function fInitMouse()
+{
+	fMouseEvents(e5, 1); // , fMouseScreen)
+	fMousePointer(nBDEAw);
+}
+
+function fMouseEvents(e, n)
 {
 	onEvent(e5, "mousemove",	fMouseMove);
 	onEvent(e5, "mousedown",	fMouseDown);
 	onEvent(e5, "contextmenu",	fMouseMenu);
 	onEvent(e5, "mouseup",		fMouseUp);
+
+	onEvent($("iJoy1"), "mousemove",	fJoy1Move);
+	onEvent($("iJoy1"), "mousedown",	fJoy1FireDown);
+	onEvent($("iJoy1"), "mouseup",		fJoy1FireUp);
+}
+
+function fJoy1Move(e)
+{
+	var rect = $("iJoy1").getBoundingClientRect();
+	e = e || window.event;
+//	fDebug(e.clientX + ' ' + e.clientY + ' ' + rect.top + ' ' + rect.left + ' ' + rect.bottom + ' ' + rect.right);
+	e = (((e.clientY - rect.top) * 3 / (rect.bottom - rect.top + 1)) | 0) * 3 + (((e.clientX - rect.left) * 3 / (rect.right - rect.left + 1)) | 0);
+	if (nJoy1Pos - e) { $("iJoy1").style.cursor = "url(./mouse_pointer_dir_" + e + ".png) 16 16, auto"; nJoyMMC |= aJoyMMC [nJoy1Pos]; nJoyMMC &= 255 - aJoyMMC [nJoy1Pos = e]; }
+}
+
+function fJoy1FireDown(e)
+{
+	nJoyMMC &= 255 - (1 << JOY_FIRE);
+	return fEndEvent(e || window.event, 2);
+}
+
+function fJoy1FireUp(e)
+{
+	e = e || window.event;
+	nJoyMMC |= 1 << JOY_FIRE;
+	return fEndEvent(e || window.event, 2);
 }
 
 function fMouseMove(e)
@@ -155,15 +249,15 @@ function fMouseMove(e)
 function fMouseDown(e)
 {
 	e = e || window.event;
-	nBDEA &= BYT - (1 << e.button);
+	nBDEA = fBit(nBDEA, e.button, false);
 	return fEndEvent(e, 2);
 }
 
 function fMouseUp(e)
 {
 	e = e || window.event;
-	nBDEA |= 1 << e.button;
-	return fEndEvent(e, 2);
+	nBDEA = fBit(nBDEA, e.button, true);
+//	return fEndEvent(e, 2);
 }
 
 function fMouseMenu(e)
@@ -174,9 +268,8 @@ function fMouseMenu(e)
 
 function fMouseCtrl(nVal)
 {
-	nBDEAw = nVal;
-	nBDEA = nBDEAw & 0x80 ? nBDEA | 0x80 : nBDEA & 0x7F;
-	fMousePointer(nBDEAw);
+	nBDEA = fBit(nBDEA, 7, nVal & 0x80);
+	fMousePointer(nBDEAw = nVal);
 }
 
 function fMousePointer(p)

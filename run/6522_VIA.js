@@ -2,7 +2,7 @@
 var
 	nTimerOut	= 1,
 	nLines,
-
+	sPrBuf		= "",
 	nPortAInt	= 0x03,
 	nPortBInt	= 0x18,
 
@@ -122,6 +122,14 @@ function fVIAWrite(nAddr, nVal)
 {//fDebug("VIAW: "+fHexWord(nAddr)+' '+nVal)
 	switch (nAddr & 0x0f) {
 		case _ORA:	oVia.nIFR &= 0xfc; fVIAIFRUpdate();
+				switch (nVal)
+				{
+				case 13:
+					sPrBuf=sPrBuf + "\n";
+					break;
+				default:
+					sPrBuf=sPrBuf + String.fromCharCode(nVal);
+				}
 		case _ORAnh:oVia.nORA = nVal; return oVia.nPortA = (oVia.nPortA & ~oVia.nDDRA) | (oVia.nORA & oVia.nDDRA);
 		case _ORB:	oVia.nORB = nVal; oVia.nPortB = (oVia.nPortB & ~oVia.nDDRB) | (oVia.nORB & oVia.nDDRB);
 					oVia.nIFR &= 0xfe; return fVIAIFRUpdate();
