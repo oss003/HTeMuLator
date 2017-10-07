@@ -617,6 +617,7 @@ function fMMCWrite(nAddr,nVal){
               globalData [1] = parseInt(nDay   + "", 16);			// UTC Date returned in BCD format
               globalData [2] = parseInt(nMonth + "", 16);
               globalData [3] = parseInt(nYear  + "", 16);
+              globalData [4] = nWeekDay;
               break;
 
             case CMD_GET_UNIX_TIME:
